@@ -1,0 +1,1054 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Voice Meeting Scheduler</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        display: ['Space Grotesk', 'sans-serif'],
+                        mono: ['JetBrains Mono', 'monospace'],
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        :root {
+            --bg: #0a0e17;
+            --card: #111827;
+            --accent: #10b981;
+            --accent-glow: rgba(16,185,129,0.25);
+            --secondary: #f59e0b;
+            --text: #e2e8f0;
+            --muted: #64748b;
+            --border: #1e293b;
+            --danger: #ef4444;
+        }
+        * { box-sizing: border-box; }
+        body {
+            font-family: 'Space Grotesk', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+        }
+        .bg-grid {
+            position: fixed; inset: 0; z-index: 0; pointer-events: none;
+            background-image: radial-gradient(rgba(16,185,129,0.06) 1px, transparent 1px);
+            background-size: 30px 30px;
+        }
+        .bg-blob {
+            position: fixed; border-radius: 50%; filter: blur(120px); opacity: 0.12;
+            z-index: 0; pointer-events: none;
+            animation: blobFloat 25s ease-in-out infinite;
+        }
+        @keyframes blobFloat {
+            0%,100% { transform: translate(0,0) scale(1); }
+            33% { transform: translate(30px,-40px) scale(1.08); }
+            66% { transform: translate(-25px,25px) scale(0.94); }
+        }
+        .glass-card {
+            background: rgba(17,24,39,0.75);
+            backdrop-filter: blur(16px);
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            transition: border-color 0.3s;
+        }
+        .glass-card:hover { border-color: rgba(16,185,129,0.25); }
+        .mic-btn {
+            width: 96px; height: 96px; border-radius: 50%; border: none; cursor: pointer;
+            background: linear-gradient(135deg, var(--accent), #059669);
+            display: flex; align-items: center; justify-content: center;
+            position: relative; transition: all 0.3s;
+            box-shadow: 0 0 30px var(--accent-glow);
+        }
+        .mic-btn:hover { transform: scale(1.06); box-shadow: 0 0 50px var(--accent-glow); }
+        .mic-btn.active { animation: micPulse 1.5s ease-in-out infinite; }
+        .mic-btn.active::before, .mic-btn.active::after {
+            content: ''; position: absolute; border-radius: 50%;
+            border: 2px solid var(--accent); animation: micRing 1.8s ease-out infinite;
+        }
+        .mic-btn.active::before { width: 130%; height: 130%; }
+        .mic-btn.active::after { width: 160%; height: 160%; animation-delay: 0.6s; border-width: 1px; }
+        @keyframes micPulse {
+            0%,100% { box-shadow: 0 0 30px var(--accent-glow); }
+            50% { box-shadow: 0 0 60px var(--accent-glow), 0 0 100px rgba(16,185,129,0.1); }
+        }
+        @keyframes micRing { 0%{opacity:1;transform:scale(1)} 100%{opacity:0;transform:scale(1.4)} }
+        .waveform { display: flex; align-items: center; justify-content: center; gap: 3px; height: 36px; }
+        .waveform-bar {
+            width: 4px; height: 6px; background: var(--accent); border-radius: 2px;
+            transition: height 0.15s;
+        }
+        .waveform.active .waveform-bar { animation: waveAnim 0.6s ease-in-out infinite alternate; }
+        .waveform.active .waveform-bar:nth-child(1){animation-delay:0s}
+        .waveform.active .waveform-bar:nth-child(2){animation-delay:.08s}
+        .waveform.active .waveform-bar:nth-child(3){animation-delay:.16s}
+        .waveform.active .waveform-bar:nth-child(4){animation-delay:.24s}
+        .waveform.active .waveform-bar:nth-child(5){animation-delay:.32s}
+        .waveform.active .waveform-bar:nth-child(6){animation-delay:.24s}
+        .waveform.active .waveform-bar:nth-child(7){animation-delay:.16s}
+        .waveform.active .waveform-bar:nth-child(8){animation-delay:.08s}
+        .waveform.active .waveform-bar:nth-child(9){animation-delay:0s}
+        @keyframes waveAnim { 0%{height:6px} 100%{height:30px} }
+        .fi {
+            background: rgba(10,14,23,0.8); border: 1px solid var(--border); border-radius: 10px;
+            padding: 10px 14px; color: var(--text); font-family: inherit; font-size: 14px;
+            width: 100%; outline: none; transition: all 0.3s;
+        }
+        .fi:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-glow); }
+        .fi::placeholder { color: var(--muted); }
+        select.fi {
+            appearance: none; cursor: pointer;
+            background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%2364748b' viewBox='0 0 16 16'%3E%3Cpath d='M8 11L3 6h10z'/%3E%3C/svg%3E");
+            background-repeat: no-repeat; background-position: right 12px center;
+        }
+        textarea.fi { resize: vertical; min-height: 80px; }
+        .btn-p {
+            background: linear-gradient(135deg, var(--accent), #059669); color: #fff;
+            font-weight: 600; padding: 11px 28px; border-radius: 10px; border: none;
+            cursor: pointer; font-family: inherit; font-size: 14px; transition: all 0.3s;
+        }
+        .btn-p:hover { transform: translateY(-1px); box-shadow: 0 4px 24px var(--accent-glow); }
+        .btn-p:active { transform: translateY(0); }
+        .btn-p:disabled { opacity: 0.5; cursor: not-allowed; transform: none; box-shadow: none; }
+        .btn-s {
+            background: transparent; color: var(--muted); font-weight: 500;
+            padding: 11px 24px; border-radius: 10px; border: 1px solid var(--border);
+            cursor: pointer; font-family: inherit; font-size: 14px; transition: all 0.3s;
+        }
+        .btn-s:hover { border-color: var(--muted); color: var(--text); }
+        .btn-icon {
+            width: 36px; height: 36px; border-radius: 8px; border: 1px solid var(--border);
+            background: transparent; color: var(--muted); cursor: pointer; display: flex;
+            align-items: center; justify-content: center; transition: all 0.2s;
+        }
+        .btn-icon:hover { border-color: var(--accent); color: var(--accent); background: rgba(16,185,129,0.08); }
+        #toast-box { position: fixed; top: 20px; right: 20px; z-index: 9999; display: flex; flex-direction: column; gap: 8px; }
+        .toast {
+            padding: 14px 20px; border-radius: 12px; font-size: 14px; font-weight: 500;
+            transform: translateX(120%); transition: transform 0.4s cubic-bezier(0.34,1.56,0.64,1);
+            max-width: 380px; backdrop-filter: blur(16px);
+        }
+        .toast.show { transform: translateX(0); }
+        .toast-ok { background: rgba(16,185,129,0.15); border: 1px solid rgba(16,185,129,0.3); color: #34d399; }
+        .toast-err { background: rgba(239,68,68,0.15); border: 1px solid rgba(239,68,68,0.3); color: #fca5a5; }
+        .toast-warn { background: rgba(245,158,11,0.15); border: 1px solid rgba(245,158,11,0.3); color: #fcd34d; }
+        .modal-bg {
+            position: fixed; inset: 0; background: rgba(0,0,0,0.7); backdrop-filter: blur(6px);
+            z-index: 5000; display: flex; align-items: flex-start; justify-content: center;
+            padding-top: 40px; opacity: 0; pointer-events: none; transition: opacity 0.3s;
+            overflow-y: auto;
+        }
+        .modal-bg.open { opacity: 1; pointer-events: all; }
+        .modal-box {
+            background: var(--card); border: 1px solid var(--border); border-radius: 20px;
+            padding: 28px 32px; max-width: 720px; width: 92%; margin-bottom: 40px;
+            transform: scale(0.92) translateY(16px); transition: transform 0.3s;
+        }
+        .modal-bg.open .modal-box { transform: scale(1) translateY(0); }
+        .code-blk {
+            background: #070a10; border: 1px solid var(--border); border-radius: 10px;
+            padding: 16px; font-family: 'JetBrains Mono', monospace; font-size: 11px;
+            line-height: 1.6; overflow-x: auto; white-space: pre; color: #a5f3fc;
+            max-height: 400px; overflow-y: auto;
+        }
+        .meet-item {
+            padding: 12px 14px; background: rgba(10,14,23,0.5); border-radius: 10px;
+            border: 1px solid transparent; transition: all 0.2s;
+        }
+        .meet-item:hover { border-color: var(--border); background: rgba(10,14,23,0.8); }
+        .chip {
+            display: inline-flex; align-items: center; gap: 6px; padding: 5px 12px;
+            background: rgba(16,185,129,0.08); border: 1px solid rgba(16,185,129,0.2);
+            border-radius: 20px; font-size: 12.5px; transition: all 0.2s; cursor: pointer;
+        }
+        .chip:hover { background: rgba(16,185,129,0.18); border-color: rgba(16,185,129,0.4); }
+        .spin { width:18px;height:18px;border:2px solid rgba(255,255,255,0.3);border-top-color:#fff;border-radius:50%;animation:sp .7s linear infinite;display:inline-block; }
+        @keyframes sp { to{transform:rotate(360deg)} }
+        @keyframes fadeUp { from{opacity:0;transform:translateY(18px)} to{opacity:1;transform:translateY(0)} }
+        .fade-up { animation: fadeUp 0.5s ease-out forwards; }
+        .fd1{animation-delay:.05s;opacity:0} .fd2{animation-delay:.12s;opacity:0}
+        .fd3{animation-delay:.2s;opacity:0} .fd4{animation-delay:.28s;opacity:0}
+        ::-webkit-scrollbar{width:5px} ::-webkit-scrollbar-track{background:transparent}
+        ::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
+        .sdot { width:7px;height:7px;border-radius:50%;display:inline-block; }
+        .sdot-on { background:var(--accent); box-shadow:0 0 6px var(--accent-glow); }
+        .sdot-off { background:var(--danger); }
+        .setup-banner {
+            background: linear-gradient(135deg, rgba(245,158,11,0.1), rgba(245,158,11,0.05));
+            border: 1px solid rgba(245,158,11,0.3);
+            border-radius: 12px; padding: 14px 20px;
+            display: flex; align-items: center; gap: 12px; cursor: pointer;
+            transition: all 0.3s;
+        }
+        .setup-banner:hover { background: linear-gradient(135deg, rgba(245,158,11,0.15), rgba(245,158,11,0.08)); border-color: rgba(245,158,11,0.5); }
+        .step-num {
+            width: 28px; height: 28px; border-radius: 50%; display: flex;
+            align-items: center; justify-content: center; font-weight: 700;
+            font-size: 13px; flex-shrink: 0;
+            background: linear-gradient(135deg, var(--accent), #059669); color: #fff;
+        }
+        @media (prefers-reduced-motion: reduce) {
+            *,*::before,*::after { animation-duration:0.01ms!important; transition-duration:0.01ms!important; }
+        }
+    </style>
+</head>
+<body class="min-h-screen relative">
+    <div class="bg-grid"></div>
+    <div class="bg-blob" style="width:500px;height:500px;background:var(--accent);top:-120px;right:-80px;"></div>
+    <div class="bg-blob" style="width:380px;height:380px;background:var(--secondary);bottom:-80px;left:-100px;animation-delay:-12s;"></div>
+
+    <div id="toast-box"></div>
+
+    <!-- ========== SETUP GUIDE MODAL ========== -->
+    <div id="modal-setup" class="modal-bg">
+        <div class="modal-box">
+            <div class="flex items-center justify-between mb-6">
+                <h2 class="text-xl font-bold"><i class="fa-solid fa-wand-magic-sparkles mr-2" style="color:var(--accent)"></i>Setup Guide</h2>
+                <button class="btn-icon" onclick="closeModal('modal-setup')"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+
+            <!-- Step 1 -->
+            <div class="glass-card p-4 mb-4">
+                <div class="flex items-start gap-3">
+                    <span class="step-num">1</span>
+                    <div>
+                        <h3 class="font-semibold text-sm mb-1">Create a Google Sheet</h3>
+                        <p class="text-xs" style="color:var(--muted)">Go to <a href="https://sheets.google.com" target="_blank" class="underline" style="color:var(--accent)">sheets.google.com</a> and create a new spreadsheet named "Meeting Scheduler".</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Step 2 -->
+            <div class="glass-card p-4 mb-4">
+                <div class="flex items-start gap-3">
+                    <span class="step-num">2</span>
+                    <div>
+                        <h3 class="font-semibold text-sm mb-1">Open Apps Script</h3>
+                        <p class="text-xs" style="color:var(--muted)">In the sheet menu, click <strong style="color:var(--text)">Extensions &rarr; Apps Script</strong>. This opens the script editor in a new tab.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Step 3 -->
+            <div class="glass-card p-4 mb-4">
+                <div class="flex items-start gap-3">
+                    <span class="step-num">3</span>
+                    <div class="flex-1">
+                        <h3 class="font-semibold text-sm mb-1">Paste This Code</h3>
+                        <p class="text-xs mb-3" style="color:var(--muted)">Delete everything in the script editor. Then copy and paste the code below:</p>
+                        <div class="relative">
+                            <button class="btn-icon absolute top-2 right-2 z-10" onclick="copyScript()" title="Copy to clipboard" style="background:rgba(16,185,129,0.15);border-color:var(--accent);color:var(--accent)">
+                                <i class="fa-solid fa-copy" id="copy-icon"></i>
+                            </button>
+                            <div class="code-blk" id="script-code">// === Voice Meeting Scheduler - Google Apps Script ===
+// Paste this in Extensions > Apps Script inside your Google Sheet
+
+const SHEET_NAME = 'Meetings';
+
+function doPost(e) {
+  try {
+    var data = JSON.parse(e.postData.contents);
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName(SHEET_NAME);
+
+    if (!sheet) {
+      sheet = ss.insertSheet(SHEET_NAME);
+      sheet.appendRow(['Timestamp','Title','Date','Time','Duration (min)','Your Email','Guest Email','Description','Status']);
+      sheet.getRange(1, 1, 1, 9).setFontWeight('bold');
+    }
+
+    // 1. Save to Google Sheet
+    sheet.appendRow([
+      new Date().toISOString(),
+      data.title,
+      data.date,
+      data.time,
+      data.duration,
+      data.yourEmail,
+      data.guestEmail,
+      data.description,
+      'Scheduled'
+    ]);
+
+    // 2. Create Google Calendar event with guest
+    var startTime = new Date(data.date + 'T' + data.time + ':00');
+    var endTime = new Date(startTime.getTime() + parseInt(data.duration) * 60000);
+
+    var event = CalendarApp.getDefaultCalendar().createEvent(
+      data.title,
+      startTime,
+      endTime,
+      {
+        description: data.description + '\n\nScheduled via Voice Meeting Scheduler',
+        guests: data.guestEmail,
+        sendInvites: true
+      }
+    );
+
+    // 3. Send confirmation emails
+    var details = 'Meeting: ' + data.title +
+      '\nDate: ' + data.date +
+      '\nTime: ' + data.time +
+      '\nDuration: ' + data.duration + ' minutes' +
+      '\nYour Email: ' + data.yourEmail +
+      '\nGuest Email: ' + data.guestEmail +
+      '\nDescription: ' + data.description +
+      '\n\nCalendar event created.';
+
+    MailApp.sendEmail({
+      to: data.yourEmail,
+      subject: 'Meeting Scheduled: ' + data.title,
+      body: details
+    });
+
+    MailApp.sendEmail({
+      to: data.guestEmail,
+      subject: 'Meeting Invitation: ' + data.title,
+      body: 'You have been invited to a meeting:\n\n' + details
+    });
+
+    return ContentService.createTextOutput(
+      JSON.stringify({ status: 'success', eventId: event.getId() })
+    ).setMimeType(ContentService.MimeType.JSON);
+
+  } catch (error) {
+    return ContentService.createTextOutput(
+      JSON.stringify({ status: 'error', message: error.toString() })
+    ).setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
+function doGet(e) {
+  try {
+    var ss = SpreadsheetApp.getActiveSpreadsheet();
+    var sheet = ss.getSheetByName(SHEET_NAME);
+    if (!sheet) {
+      return ContentService.createTextOutput(JSON.stringify([]))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+    var data = sheet.getDataRange().getValues();
+    var headers = data[0];
+    var rows = data.slice(1).map(function(row) {
+      var obj = {};
+      headers.forEach(function(h, i) { obj[h] = row[i]; });
+      return obj;
+    });
+    return ContentService.createTextOutput(JSON.stringify(rows))
+      .setMimeType(ContentService.MimeType.JSON);
+  } catch (error) {
+    return ContentService.createTextOutput(
+      JSON.stringify({ status: 'error', message: error.toString() })
+    ).setMimeType(ContentService.MimeType.JSON);
+  }
+}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Step 4 -->
+            <div class="glass-card p-4 mb-4">
+                <div class="flex items-start gap-3">
+                    <span class="step-num">4</span>
+                    <div>
+                        <h3 class="font-semibold text-sm mb-1">Deploy as Web App</h3>
+                        <p class="text-xs" style="color:var(--muted)">Click <strong style="color:var(--text)">Deploy &rarr; New deployment</strong>.</p>
+                        <ul class="text-xs mt-2 space-y-1 ml-4" style="color:var(--muted)">
+                            <li>&#8226; Click the gear icon next to "Select type" &rarr; choose <strong style="color:var(--text)">Web app</strong></li>
+                            <li>&#8226; Description: <code style="color:var(--accent)">Meeting Scheduler</code></li>
+                            <li>&#8226; Execute as: <strong style="color:var(--text)">Me</strong></li>
+                            <li>&#8226; Who has access: <strong style="color:var(--text)">Anyone</strong></li>
+                        </ul>
+                        <p class="text-xs mt-2" style="color:var(--muted)">Click <strong style="color:var(--text)">Deploy</strong>. Google will ask you to authorize &mdash; click <strong style="color:var(--text)">Advanced &rarr; Go to project</strong> to approve.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Step 5 -->
+            <div class="glass-card p-4 mb-4">
+                <div class="flex items-start gap-3">
+                    <span class="step-num">5</span>
+                    <div>
+                        <h3 class="font-semibold text-sm mb-1">Copy the Web App URL</h3>
+                        <p class="text-xs" style="color:var(--muted)">After deploying, you'll see a <strong style="color:var(--text)">Web app URL</strong>. Copy it and paste it in the Settings panel below.</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Step 6 -->
+            <div class="glass-card p-4 mb-2">
+                <div class="flex items-start gap-3">
+                    <span class="step-num">6</span>
+                    <div>
+                        <h3 class="font-semibold text-sm mb-1">Paste URL in Settings</h3>
+                        <p class="text-xs" style="color:var(--muted)">Close this guide, then paste the URL into the <strong style="color:var(--text)">Apps Script URL</strong> field in Settings. You're all set!</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="flex gap-3 mt-6">
+                <button class="btn-p text-sm" onclick="closeModal('modal-setup');openModal('modal-settings')">
+                    <i class="fa-solid fa-gear mr-1"></i> Open Settings
+                </button>
+                <button class="btn-s text-sm" onclick="closeModal('modal-setup')">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========== SETTINGS MODAL ========== -->
+    <div id="modal-settings" class="modal-bg">
+        <div class="modal-box" style="max-width:520px">
+            <div class="flex items-center justify-between mb-6">
+                <h2 class="text-xl font-bold"><i class="fa-solid fa-gear mr-2" style="color:var(--accent)"></i>Settings</h2>
+                <button class="btn-icon" onclick="closeModal('modal-settings')"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div class="space-y-5">
+                <div>
+                    <label class="block text-sm font-medium mb-1.5 text-slate-300">Your Email</label>
+                    <input id="cfg-email" type="email" class="fi" placeholder="you@example.com">
+                    <p class="text-xs mt-1" style="color:var(--muted)">Used as organizer for calendar invites and email notifications</p>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium mb-1.5 text-slate-300">Google Apps Script URL</label>
+                    <input id="cfg-url" type="url" class="fi font-mono text-xs" placeholder="https://script.google.com/macros/s/AKfycbxlWA7nkn3SSLkEukkSlai5Qnh1NnQ4B-gfI9zkQWVsClHYihCvziV1GvEZTFYIkWIF/exec">
+                    <div class="flex items-center gap-2 mt-1.5">
+                        <span class="sdot" id="cfg-status"></span>
+                        <span class="text-xs" style="color:var(--muted)" id="cfg-status-text">Not configured</span>
+                    </div>
+                </div>
+                <div class="flex gap-3 pt-2">
+                    <button class="btn-p text-sm" onclick="saveSettings()"><i class="fa-solid fa-check mr-1"></i> Save Settings</button>
+                    <button class="btn-s text-sm" onclick="closeModal('modal-settings');openModal('modal-setup')"><i class="fa-solid fa-wand-magic-sparkles mr-1"></i> Setup Guide</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========== MAIN CONTENT ========== -->
+    <div class="relative z-10 max-w-5xl mx-auto px-4 py-6 sm:px-6 lg:px-8">
+
+        <!-- Header -->
+        <header class="flex items-center justify-between mb-6 fade-up">
+            <div>
+                <h1 class="text-2xl sm:text-3xl font-bold tracking-tight">
+                    <span style="color:var(--accent)">Voice</span> Meeting Scheduler
+                </h1>
+                <p class="text-sm mt-1" style="color:var(--muted)">Schedule meetings with your voice — synced to Sheets, Calendar &amp; Email</p>
+            </div>
+            <div class="flex items-center gap-2">
+                <button class="btn-icon" onclick="openModal('modal-settings')" title="Settings" aria-label="Settings">
+                    <i class="fa-solid fa-gear"></i>
+                </button>
+                <button class="btn-icon" onclick="openModal('modal-setup')" title="Setup Guide" aria-label="Setup Guide" style="border-color:var(--secondary);color:var(--secondary)">
+                    <i class="fa-solid fa-circle-question"></i>
+                </button>
+            </div>
+        </header>
+
+        <!-- Setup Banner (shown only when not configured) -->
+        <div id="setup-banner" class="setup-banner mb-6 fade-up fd1" onclick="openModal('modal-setup')">
+            <i class="fa-solid fa-triangle-exclamation text-lg" style="color:var(--secondary)"></i>
+            <div class="flex-1">
+                <p class="text-sm font-semibold" style="color:var(--secondary)">Google Apps Script not configured</p>
+                <p class="text-xs" style="color:var(--muted)">Click here to set up auto-sync to Google Sheets, Calendar, and Email</p>
+            </div>
+            <i class="fa-solid fa-arrow-right" style="color:var(--secondary)"></i>
+        </div>
+
+        <!-- Voice Input Section -->
+        <section class="glass-card p-6 sm:p-8 mb-6 fade-up fd1">
+            <div class="flex flex-col items-center text-center">
+                <button id="mic-btn" class="mic-btn mb-4" onclick="toggleMic()" aria-label="Toggle microphone">
+                    <i class="fa-solid fa-microphone text-3xl text-white" id="mic-icon"></i>
+                </button>
+                <div class="waveform mb-3" id="waveform">
+                    <div class="waveform-bar"></div><div class="waveform-bar"></div>
+                    <div class="waveform-bar"></div><div class="waveform-bar"></div>
+                    <div class="waveform-bar"></div><div class="waveform-bar"></div>
+                    <div class="waveform-bar"></div><div class="waveform-bar"></div>
+                    <div class="waveform-bar"></div>
+                </div>
+                <p class="text-sm mb-4" style="color:var(--muted)" id="mic-status">Click the microphone to start</p>
+
+                <div class="w-full max-w-xl">
+                    <div class="flex gap-3 mb-3">
+                        <select id="lang-sel" class="fi" style="max-width:180px">
+                            <option value="en-US">English (US)</option>
+                            <option value="en-GB">English (UK)</option>
+                            <option value="es-ES">Spanish</option>
+                            <option value="fr-FR">French</option>
+                            <option value="de-DE">German</option>
+                            <option value="it-IT">Italian</option>
+                            <option value="pt-BR">Portuguese (BR)</option>
+                            <option value="ja-JP">Japanese</option>
+                            <option value="ko-KR">Korean</option>
+                            <option value="zh-CN">Chinese (Simplified)</option>
+                            <option value="hi-IN">Hindi</option>
+                            <option value="ar-SA">Arabic</option>
+                        </select>
+                        <div class="flex-1"></div>
+                        <button class="btn-s text-xs px-4" onclick="clearTranscript()">
+                            <i class="fa-solid fa-eraser mr-1"></i> Clear
+                        </button>
+                    </div>
+                    <textarea id="transcript" class="fi" rows="3" placeholder="Your speech will appear here... You can also type directly. Try: &quot;Schedule a meeting with alice@company.com tomorrow at 3pm for 45 minutes&quot;"></textarea>
+                    <div class="flex gap-3 mt-3 justify-center">
+                        <button class="btn-p text-sm" onclick="parseAndFill()">
+                            <i class="fa-solid fa-wand-magic-sparkles mr-1"></i> Schedule Meeting
+                        </button>
+                        <button class="btn-s text-sm" onclick="clearAll()">
+                            <i class="fa-solid fa-rotate-left mr-1"></i> Reset All
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Meeting Form -->
+        <section class="glass-card p-6 sm:p-8 mb-6 fade-up fd2" id="form-section">
+            <h2 class="text-lg font-bold mb-5 flex items-center gap-2">
+                <i class="fa-solid fa-calendar-plus" style="color:var(--accent)"></i> Meeting Details
+            </h2>
+            <form id="meet-form" onsubmit="handleSubmit(event)" class="space-y-4">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div class="sm:col-span-2">
+                        <label class="block text-xs font-medium mb-1" style="color:var(--muted)">Meeting Title</label>
+                        <input id="f-title" class="fi" placeholder="e.g. Project Sync with Alice" required>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium mb-1" style="color:var(--muted)">Date</label>
+                        <input id="f-date" type="date" class="fi" required>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium mb-1" style="color:var(--muted)">Time</label>
+                        <input id="f-time" type="time" class="fi" required>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium mb-1" style="color:var(--muted)">Duration (minutes)</label>
+                        <input id="f-dur" type="number" class="fi" value="30" min="5" max="480" required>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium mb-1" style="color:var(--muted)">Your Email</label>
+                        <input id="f-youremail" type="email" class="fi" placeholder="you@example.com" required>
+                    </div>
+                    <div class="sm:col-span-2">
+                        <label class="block text-xs font-medium mb-1" style="color:var(--muted)">Guest Email</label>
+                        <input id="f-guest" type="email" class="fi" placeholder="guest@company.com" required>
+                    </div>
+                    <div class="sm:col-span-2">
+                        <label class="block text-xs font-medium mb-1" style="color:var(--muted)">Description</label>
+                        <textarea id="f-desc" class="fi" rows="2" placeholder="Agenda, notes, or context..."></textarea>
+                    </div>
+                </div>
+                <div class="flex items-center gap-4 pt-2">
+                    <button type="submit" class="btn-p" id="submit-btn">
+                        <i class="fa-solid fa-paper-plane mr-2"></i> Submit &amp; Schedule
+                    </button>
+                    <span class="text-xs" style="color:var(--muted)" id="submit-status"></span>
+                </div>
+            </form>
+        </section>
+
+        <!-- Bottom Grid -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
+            <section class="glass-card p-5 fade-up fd3">
+                <h2 class="text-sm font-bold mb-3 flex items-center gap-2 uppercase tracking-wider" style="color:var(--muted)">
+                    <i class="fa-solid fa-circle-check" style="color:var(--accent)"></i> Result
+                </h2>
+                <div id="result-box" class="text-sm" style="color:var(--muted)">
+                    <p>No meetings scheduled yet. Use voice input or fill the form above.</p>
+                </div>
+            </section>
+            <section class="glass-card p-5 fade-up fd3">
+                <h2 class="text-sm font-bold mb-3 flex items-center gap-2 uppercase tracking-wider" style="color:var(--muted)">
+                    <i class="fa-solid fa-address-book" style="color:var(--secondary)"></i> Contacts
+                </h2>
+                <div id="contacts-box" class="flex flex-wrap gap-2"></div>
+            </section>
+            <section class="glass-card p-5 fade-up fd4">
+                <h2 class="text-sm font-bold mb-3 flex items-center gap-2 uppercase tracking-wider" style="color:var(--muted)">
+                    <i class="fa-solid fa-clock-rotate-left" style="color:var(--accent)"></i> Recent Meetings
+                </h2>
+                <div id="meetings-box" class="space-y-2 max-h-64 overflow-y-auto"></div>
+            </section>
+        </div>
+
+        <footer class="text-center text-xs pb-6" style="color:var(--border)">
+            Voice Meeting Scheduler &mdash; Powered by Web Speech API &amp; Google Apps Script
+        </footer>
+    </div>
+
+<script>
+/* ========== APP STATE ========== */
+var APP_KEY = 'vms_';
+var isListening = false;
+var recognition = null;
+var finalTranscript = '';
+
+/* ========== UTILITY ========== */
+function lsGet(k) { try { return JSON.parse(localStorage.getItem(APP_KEY + k)); } catch(e) { return null; } }
+function lsSet(k, v) { localStorage.setItem(APP_KEY + k, JSON.stringify(v)); }
+
+function openModal(id) {
+    document.getElementById(id).classList.add('open');
+    document.body.style.overflow = 'hidden';
+}
+function closeModal(id) {
+    document.getElementById(id).classList.remove('open');
+    document.body.style.overflow = '';
+}
+
+function showToast(msg, type) {
+    type = type || 'ok';
+    var box = document.getElementById('toast-box');
+    var t = document.createElement('div');
+    var iconClass = type === 'ok' ? 'fa-circle-check' : type === 'err' ? 'fa-circle-exclamation' : 'fa-triangle-exclamation';
+    t.className = 'toast toast-' + type;
+    t.innerHTML = '<i class="fa-solid ' + iconClass + ' mr-2"></i>' + msg;
+    box.appendChild(t);
+    requestAnimationFrame(function() { t.classList.add('show'); });
+    setTimeout(function() { t.classList.remove('show'); setTimeout(function() { t.remove(); }, 400); }, 4000);
+}
+
+function formatDate(d) {
+    return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+}
+
+/* ========== SETTINGS ========== */
+function loadSettings() {
+    var email = lsGet('email') || '';
+    var url = lsGet('scriptUrl') || '';
+    document.getElementById('cfg-email').value = email;
+    document.getElementById('cfg-url').value = url;
+    document.getElementById('f-youremail').value = email;
+    updateStatus();
+    updateBanner();
+}
+
+function saveSettings() {
+    var email = document.getElementById('cfg-email').value.trim();
+    var url = document.getElementById('cfg-url').value.trim();
+    lsSet('email', email);
+    lsSet('scriptUrl', url);
+    document.getElementById('f-youremail').value = email;
+    updateStatus();
+    updateBanner();
+    showToast('Settings saved successfully!', 'ok');
+    closeModal('modal-settings');
+}
+
+function updateStatus() {
+    var url = lsGet('scriptUrl');
+    var dot = document.getElementById('cfg-status');
+    var txt = document.getElementById('cfg-status-text');
+    if (url) {
+        dot.className = 'sdot sdot-on';
+        txt.textContent = 'Apps Script configured';
+        txt.style.color = 'var(--accent)';
+    } else {
+        dot.className = 'sdot sdot-off';
+        txt.textContent = 'Not configured — click Setup Guide';
+        txt.style.color = 'var(--muted)';
+    }
+}
+
+function updateBanner() {
+    var url = lsGet('scriptUrl');
+    var banner = document.getElementById('setup-banner');
+    if (url) {
+        banner.style.display = 'none';
+    } else {
+        banner.style.display = 'flex';
+    }
+}
+
+function copyScript() {
+    var code = document.getElementById('script-code').textContent;
+    navigator.clipboard.writeText(code).then(function() {
+        showToast('Script copied to clipboard!', 'ok');
+        var icon = document.getElementById('copy-icon');
+        icon.className = 'fa-solid fa-check';
+        setTimeout(function() { icon.className = 'fa-solid fa-copy'; }, 2000);
+    }).catch(function() {
+        // Fallback for older browsers
+        var ta = document.createElement('textarea');
+        ta.value = code;
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+        showToast('Script copied to clipboard!', 'ok');
+    });
+}
+
+/* ========== VOICE RECOGNITION ========== */
+function initSpeech() {
+    var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SR) {
+        document.getElementById('mic-status').textContent = 'Speech recognition not supported in this browser — type manually';
+        document.getElementById('mic-btn').style.opacity = '0.4';
+        document.getElementById('mic-btn').style.cursor = 'not-allowed';
+        return;
+    }
+    recognition = new SR();
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    recognition.lang = document.getElementById('lang-sel').value;
+
+    recognition.onresult = function(e) {
+        var interim = '';
+        for (var i = e.resultIndex; i < e.results.length; i++) {
+            if (e.results[i].isFinal) {
+                finalTranscript += e.results[i][0].transcript + ' ';
+            } else {
+                interim += e.results[i][0].transcript;
+            }
+        }
+        document.getElementById('transcript').value = finalTranscript + interim;
+    };
+
+    recognition.onerror = function(e) {
+        if (e.error === 'no-speech') return;
+        showToast('Speech error: ' + e.error, 'err');
+        stopListening();
+    };
+
+    recognition.onend = function() {
+        if (isListening) {
+            try { recognition.start(); } catch(e) { stopListening(); }
+        }
+    };
+}
+
+function toggleMic() {
+    if (!recognition) { showToast('Speech recognition not available in this browser', 'err'); return; }
+    if (isListening) { stopListening(); } else { startListening(); }
+}
+
+function startListening() {
+    isListening = true;
+    finalTranscript = document.getElementById('transcript').value;
+    recognition.lang = document.getElementById('lang-sel').value;
+    try { recognition.start(); } catch(e) {}
+    document.getElementById('mic-btn').classList.add('active');
+    document.getElementById('waveform').classList.add('active');
+    document.getElementById('mic-icon').className = 'fa-solid fa-stop text-3xl text-white';
+    document.getElementById('mic-status').textContent = 'Listening... speak now';
+    document.getElementById('mic-status').style.color = 'var(--accent)';
+}
+
+function stopListening() {
+    isListening = false;
+    if (recognition) try { recognition.stop(); } catch(e) {}
+    document.getElementById('mic-btn').classList.remove('active');
+    document.getElementById('waveform').classList.remove('active');
+    document.getElementById('mic-icon').className = 'fa-solid fa-microphone text-3xl text-white';
+    document.getElementById('mic-status').textContent = 'Click the microphone to start';
+    document.getElementById('mic-status').style.color = 'var(--muted)';
+}
+
+function clearTranscript() {
+    finalTranscript = '';
+    document.getElementById('transcript').value = '';
+}
+
+function clearAll() {
+    clearTranscript();
+    document.getElementById('meet-form').reset();
+    document.getElementById('f-dur').value = 30;
+    var savedEmail = lsGet('email') || '';
+    document.getElementById('f-youremail').value = savedEmail;
+    var today = new Date();
+    document.getElementById('f-date').value = formatDate(today);
+}
+
+/* ========== NLP PARSING ========== */
+var MONTHS = {jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11};
+
+function getNextWeekday(from, dayIdx) {
+    var d = new Date(from);
+    var diff = (dayIdx - d.getDay() + 7) % 7 || 7;
+    d.setDate(d.getDate() + diff);
+    return formatDate(d);
+}
+
+function parseMeetingText(text) {
+    var r = { title:'', date:'', time:'', duration:30, guestEmail:'', description:text.trim() };
+    var t = text.trim();
+    if (!t) return r;
+
+    // Extract email
+    var em = t.match(/[\w.\-]+@[\w.\-]+\.\w+/);
+    if (em) r.guestEmail = em[0];
+
+    // Extract time (12h)
+    var tm = t.match(/\b(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b/i);
+    if (tm) {
+        var h = parseInt(tm[1]); var m = tm[2] ? parseInt(tm[2]) : 0;
+        var ap = tm[3].toLowerCase();
+        if (ap === 'pm' && h !== 12) h += 12;
+        if (ap === 'am' && h === 12) h = 0;
+        r.time = String(h).padStart(2,'0') + ':' + String(m).padStart(2,'0');
+    }
+
+    // Extract duration
+    var hd = t.match(/(\d+)\s*hours?\b/i);
+    var md = t.match(/(\d+)\s*(?:min(?:ute)?s?)\b/i);
+    if (hd) r.duration = parseInt(hd[1]) * 60;
+    else if (md) r.duration = parseInt(md[1]);
+
+    // Extract date
+    var now = new Date();
+    if (/\btoday\b/i.test(t)) r.date = formatDate(now);
+    else if (/\btomorrow\b/i.test(t)) { var d = new Date(now); d.setDate(d.getDate()+1); r.date = formatDate(d); }
+    else {
+        var days = ['sunday','monday','tuesday','wednesday','thursday','friday','saturday'];
+        var found = false;
+        for (var i = 0; i < days.length; i++) {
+            var rx = new RegExp('\\b(?:next\\s+)?' + days[i] + '\\b', 'i');
+            if (rx.test(t)) { r.date = getNextWeekday(now, i); found = true; break; }
+        }
+        if (!found) {
+            var m1 = t.match(/\b(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+(\d{1,2})\b/i);
+            var m2 = t.match(/\b(\d{1,2})\s*(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\b/i);
+            var monthNum = -1, dayNum = 0;
+            if (m1) { monthNum = MONTHS[m1[1].substring(0,3).toLowerCase()]; dayNum = parseInt(m1[2]); }
+            else if (m2) { monthNum = MONTHS[m2[2].substring(0,3).toLowerCase()]; dayNum = parseInt(m2[1]); }
+            if (monthNum >= 0) {
+                var yr = now.getFullYear();
+                r.date = yr + '-' + String(monthNum+1).padStart(2,'0') + '-' + String(dayNum).padStart(2,'0');
+            }
+        }
+    }
+
+    // Extract title
+    var wm = t.match(/(?:schedule|set\s*up|book|create|arrange|organize)?\s*(?:a\s+)?(?:meeting|call|session|discussion|conference)\s+(?:with\s+)?([^\.,]+?)(?:\s+(?:on|at|for|tomorrow|next|this)\b|$)/i);
+    if (wm && wm[1].trim()) {
+        r.title = 'Meeting with ' + wm[1].trim().replace(/\s*(on|at|for|tomorrow|next|this)\b.*$/i, '').trim();
+    } else if (/\bmeeting\b/i.test(t)) {
+        r.title = 'Voice Meeting';
+    } else if (/\bcall\b/i.test(t)) {
+        r.title = 'Voice Call';
+    }
+
+    return r;
+}
+
+function parseAndFill() {
+    var text = document.getElementById('transcript').value.trim();
+    if (!text) { showToast('Please speak or type meeting details first', 'warn'); return; }
+    stopListening();
+    var d = parseMeetingText(text);
+    if (d.title) document.getElementById('f-title').value = d.title;
+    if (d.date) document.getElementById('f-date').value = d.date;
+    if (d.time) document.getElementById('f-time').value = d.time;
+    if (d.duration) document.getElementById('f-dur').value = d.duration;
+    if (d.guestEmail) document.getElementById('f-guest').value = d.guestEmail;
+    if (d.description) document.getElementById('f-desc').value = d.description;
+    var savedEmail = lsGet('email') || '';
+    if (savedEmail) document.getElementById('f-youremail').value = savedEmail;
+    showToast('Meeting details extracted — review and submit', 'ok');
+    document.getElementById('form-section').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+/* ========== FORM SUBMISSION ========== */
+function handleSubmit(ev) {
+    ev.preventDefault();
+    var btn = document.getElementById('submit-btn');
+    var statusEl = document.getElementById('submit-status');
+
+    var data = {
+        title: document.getElementById('f-title').value.trim(),
+        date: document.getElementById('f-date').value,
+        time: document.getElementById('f-time').value,
+        duration: document.getElementById('f-dur').value,
+        yourEmail: document.getElementById('f-youremail').value.trim(),
+        guestEmail: document.getElementById('f-guest').value.trim(),
+        description: document.getElementById('f-desc').value.trim()
+    };
+
+    if (!data.title || !data.date || !data.time || !data.yourEmail || !data.guestEmail) {
+        showToast('Please fill all required fields', 'err');
+        return;
+    }
+
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spin mr-2"></span> Scheduling...';
+    statusEl.textContent = '';
+
+    var scriptUrl = lsGet('scriptUrl');
+
+    if (scriptUrl) {
+        // Send to Google Apps Script
+        fetch(scriptUrl, {
+            method: 'POST',
+            mode: 'no-cors',
+            headers: { 'Content-Type': 'text/plain' },
+            body: JSON.stringify(data)
+        }).then(function() {
+            showToast('Meeting scheduled! Check Sheet/Calendar for confirmation.', 'ok');
+            showResult(data, true);
+            finishSubmit(data, btn);
+        }).catch(function(err) {
+            showToast('Error sending to Apps Script: ' + err.message, 'err');
+            showResult(data, false);
+            finishSubmit(data, btn);
+        });
+    } else {
+        // No Apps Script — download .ics file as fallback
+        showToast('Apps Script not configured — downloading .ics calendar file', 'warn');
+        downloadICS(data);
+        showResult(data, false);
+        finishSubmit(data, btn);
+    }
+}
+
+function finishSubmit(data, btn) {
+    saveMeeting(data);
+    addContact(data.guestEmail);
+    if (data.yourEmail) addContact(data.yourEmail);
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fa-solid fa-paper-plane mr-2"></i> Submit & Schedule';
+}
+
+/* ========== .ICS FILE GENERATION ========== */
+function downloadICS(d) {
+    var dtStart = d.date.replace(/-/g, '') + 'T' + d.time.replace(/:/g, '') + '00';
+    var endH = parseInt(d.time.split(':')[0]);
+    var endM = parseInt(d.time.split(':')[1]) + parseInt(d.duration);
+    var endHour = endH + Math.floor(endM / 60);
+    var endMin = endM % 60;
+    var dtEnd = d.date.replace(/-/g, '') + 'T' + String(endHour).padStart(2,'0') + String(endMin).padStart(2,'0') + '00';
+
+    var ics = 'BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//VoiceMeetingScheduler//EN\r\nBEGIN:VEVENT\r\nDTSTART:' + dtStart + '\r\nDTEND:' + dtEnd + '\r\nSUMMARY:' + d.title + '\r\nDESCRIPTION:' + (d.description || '') + '\r\nATTENDEE;CN=' + d.guestEmail + ':mailto:' + d.guestEmail + '\r\nORGANIZER;CN=' + d.yourEmail + ':mailto:' + d.yourEmail + '\r\nEND:VEVENT\r\nEND:VCALENDAR';
+
+    var blob = new Blob([ics], { type: 'text/calendar' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url; a.download = d.title.replace(/\s+/g, '_') + '.ics';
+    document.body.appendChild(a); a.click(); a.remove();
+    URL.revokeObjectURL(url);
+}
+
+/* ========== RESULT DISPLAY ========== */
+function showResult(d, synced) {
+    var box = document.getElementById('result-box');
+    var dateObj = new Date(d.date + 'T' + d.time);
+    var dateStr = dateObj.toLocaleDateString('en-US', { weekday:'short', month:'short', day:'numeric', year:'numeric' });
+    var timeStr = dateObj.toLocaleTimeString('en-US', { hour:'numeric', minute:'2-digit' });
+
+    box.innerHTML = '<div style="animation:fadeUp .4s ease-out">' +
+        '<div class="flex items-center gap-2 mb-3">' +
+            '<i class="fa-solid fa-circle-check text-xl" style="color:var(--accent)"></i>' +
+            '<span class="font-semibold" style="color:var(--accent)">' + (synced ? 'Scheduled & Synced' : 'Scheduled Locally') + '</span>' +
+        '</div>' +
+        '<div class="space-y-1.5 text-sm" style="color:var(--text)">' +
+            '<p class="font-semibold text-base">' + d.title + '</p>' +
+            '<p><i class="fa-regular fa-calendar mr-2" style="color:var(--muted)"></i>' + dateStr + '</p>' +
+            '<p><i class="fa-regular fa-clock mr-2" style="color:var(--muted)"></i>' + timeStr + ' (' + d.duration + ' min)</p>' +
+            '<p><i class="fa-regular fa-user mr-2" style="color:var(--muted)"></i>' + d.guestEmail + '</p>' +
+            (d.description ? '<p class="mt-2" style="color:var(--muted)">' + d.description + '</p>' : '') +
+        '</div>' +
+        (!synced ? '<p class="text-xs mt-3" style="color:var(--secondary)"><i class="fa-solid fa-triangle-exclamation mr-1"></i>Configure Apps Script for auto-sync to Sheets, Calendar & Email</p>' : '') +
+    '</div>';
+}
+
+/* ========== LOCAL DATA ========== */
+function saveMeeting(d) {
+    var meetings = lsGet('meetings') || [];
+    meetings.unshift({ title: d.title, date: d.date, time: d.time, duration: d.duration, yourEmail: d.yourEmail, guestEmail: d.guestEmail, description: d.description, timestamp: new Date().toISOString() });
+    if (meetings.length > 50) meetings.length = 50;
+    lsSet('meetings', meetings);
+    renderMeetings();
+}
+
+function renderMeetings() {
+    var box = document.getElementById('meetings-box');
+    var meetings = lsGet('meetings') || [];
+    if (!meetings.length) {
+        box.innerHTML = '<p class="text-xs" style="color:var(--muted)">No meetings yet. Schedule your first one above.</p>';
+        return;
+    }
+    var html = '';
+    for (var i = 0; i < Math.min(meetings.length, 15); i++) {
+        var m = meetings[i];
+        var dt = new Date(m.date + 'T' + m.time);
+        var ds = dt.toLocaleDateString('en-US', { month:'short', day:'numeric' });
+        var ts = dt.toLocaleTimeString('en-US', { hour:'numeric', minute:'2-digit' });
+        html += '<div class="meet-item"><p class="font-medium text-sm truncate">' + m.title + '</p><p class="text-xs mt-0.5" style="color:var(--muted)">' + ds + ' at ' + ts + ' &middot; ' + m.duration + 'm &middot; ' + m.guestEmail + '</p></div>';
+    }
+    box.innerHTML = html;
+}
+
+function addContact(email) {
+    if (!email) return;
+    var contacts = lsGet('contacts') || [];
+    if (contacts.indexOf(email) >= 0) return;
+    contacts.push(email);
+    lsSet('contacts', contacts);
+    renderContacts();
+}
+
+function renderContacts() {
+    var box = document.getElementById('contacts-box');
+    var contacts = lsGet('contacts') || [];
+    if (!contacts.length) {
+        box.innerHTML = '<p class="text-xs" style="color:var(--muted)">No contacts saved. Emails from scheduled meetings appear here.</p>';
+        return;
+    }
+    var html = '';
+    for (var i = 0; i < contacts.length; i++) {
+        html += '<span class="chip" onclick="fillGuest(\'' + contacts[i] + '\')"><i class="fa-regular fa-envelope text-xs" style="color:var(--accent)"></i><span>' + contacts[i] + '</span></span>';
+    }
+    box.innerHTML = html;
+}
+
+function fillGuest(email) {
+    document.getElementById('f-guest').value = email;
+    showToast('Guest email filled: ' + email, 'ok');
+    document.getElementById('form-section').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+/* ========== INIT ========== */
+document.addEventListener('DOMContentLoaded', function() {
+    loadSettings();
+    initSpeech();
+    renderContacts();
+    renderMeetings();
+
+    var today = new Date();
+    document.getElementById('f-date').value = formatDate(today);
+
+    document.getElementById('lang-sel').addEventListener('change', function() {
+        if (recognition) recognition.lang = this.value;
+    });
+
+    // Close modals with Escape key
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+            closeModal('modal-setup');
+            closeModal('modal-settings');
+        }
+    });
+
+    // Close modals by clicking backdrop
+    document.querySelectorAll('.modal-bg').forEach(function(modal) {
+        modal.addEventListener('click', function(e) {
+            if (e.target === modal) {
+                modal.classList.remove('open');
+                document.body.style.overflow = '';
+            }
+        });
+    });
+});
+</script>
+</body>
+</html>
