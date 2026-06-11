@@ -324,7 +324,7 @@
         </div>
         <div style="margin-bottom:18px">
             <label style="display:block;font-size:14px;font-weight:500;margin-bottom:6px;color:var(--text2)">Google Apps Script URL</label>
-            <input type="url" id="setUrl" class="input-field" style="font-family:'JetBrains Mono',monospace;font-size:12px" placeholder="https://script.google.com/macros/s/AKfycbz54YjaGaEzxCcG4K-0CAWxIpXIhyyhXybU6ZtskzdZDjZ0UOEWtQVfcFVvT9gY28u7/exec">
+            <input type="url" id="setUrl" class="input-field" style="font-family:'JetBrains Mono',monospace;font-size:12px" placeholder="https://script.google.com/macros/s/AKfycbz2VEp8xlekdjcBwgGts8Xm2Ij3VfVzVHBBcHFgtWb67NVwv5IgulSVNehCOBg8umJL/exec">
             <div style="display:flex;align-items:center;gap:6px;margin-top:6px">
                 <span class="dot" id="setDot"></span>
                 <span style="font-size:12px;color:var(--text3)" id="setStatus">Not configured</span>
@@ -391,9 +391,9 @@
                     <div style="flex:1"></div>
                     <button class="btn btn-ghost btn-sm" onclick="doClearText()"><i class="fa-solid fa-eraser"></i> Clear</button>
                 </div>
-                <textarea id="speechText" class="input-field" rows="3" placeholder='Try: "tomorrow meeting with naresh chavan at 12 pm" or "today rent pay at 3 pm"'></textarea>
+                <textarea id="speechText" class="input-field" rows="3" placeholder='Try: "tomorrow meeting with naresh chavan at 12 pm"'></textarea>
                 <div style="display:flex;gap:10px;margin-top:12px;justify-content:center">
-                    <button class="btn btn-green" onclick="doParse()"><i class="fa-solid fa-wand-magic-sparkles"></i> Schedule Meeting</button>
+                    <button class="btn btn-green" onclick="try { doParse(); } catch(e) { console.error('Parse error:', e); toast('Error: ' + e.message, 'err'); }"><i class="fa-solid fa-wand-magic-sparkles"></i> Schedule Meeting</button>
                     <button class="btn btn-ghost" onclick="doReset()"><i class="fa-solid fa-rotate-left"></i> Reset</button>
                 </div>
             </div>
@@ -454,7 +454,7 @@ var savedText = '';
 var preview = null;
 
 /* Google Apps Script code */
-var GAS_CODE = 'const SHEET_NAME = "Meetings";\nconst CONTACTS_SHEET = "Contacts";\n\nfunction doPost(e) {\n  try {\n    var data = JSON.parse(e.postData.contents);\n    var action = data.action || "schedule";\n    if (action === "schedule") return scheduleMeeting(data);\n    if (action === "addContact") return addContactToSheet(data);\n    if (action === "deleteContact") return deleteContactFromSheet(data);\n    if (action === "syncContacts") return syncContactsToSheet(data);\n    return ContentService.createTextOutput(JSON.stringify({status:"error",message:"Unknown action"})).setMimeType(ContentService.MimeType.JSON);\n  } catch (error) {\n    return ContentService.createTextOutput(JSON.stringify({status:"error",message:error.toString()})).setMimeType(ContentService.MimeType.JSON);\n  }\n}\n\nfunction scheduleMeeting(data) {\n  var ss = SpreadsheetApp.getActiveSpreadsheet();\n  var sheet = ss.getSheetByName(SHEET_NAME);\n  if (!sheet) {\n    sheet = ss.insertSheet(SHEET_NAME);\n    sheet.appendRow(["Timestamp","Title","Date","Time","Duration","Your Email","Guest Name","Guest Email","Description","Status"]);\n    sheet.getRange(1,1,1,10).setFontWeight("bold");\n  }\n  sheet.appendRow([new Date().toISOString(), data.title, data.date, data.time, data.duration, data.yourEmail, data.guestName||"", data.guestEmail||"", data.description||"", "Scheduled"]);\n\n  var startTime = new Date(data.date + "T" + data.time + ":00");\n  var endTime = new Date(startTime.getTime() + parseInt(data.duration)*60000);\n\n  var eventOptions = {\n    description: (data.description||"") + "\\n\\nScheduled via Voice Meeting Scheduler"\n  };\n  if (data.guestEmail) {\n    eventOptions.guests = data.guestEmail;\n    eventOptions.sendInvites = true;\n  }\n  var event = CalendarApp.getDefaultCalendar().createEvent(data.title, startTime, endTime, eventOptions);\n\n  var details = "Meeting: " + data.title + "\\nDate: " + data.date + "\\nTime: " + data.time + "\\nDuration: " + data.duration + " minutes" + (data.guestName||data.guestEmail ? "\\nGuest: " + (data.guestName||data.guestEmail) : "") + "\\nDescription: " + (data.description||"") + "\\n\\nCalendar event created.";\n\n  MailApp.sendEmail({to: data.yourEmail, subject: "Meeting Scheduled: " + data.title, body: details});\n  if (data.guestEmail) MailApp.sendEmail({to: data.guestEmail, subject: "Meeting Invitation: " + data.title, body: "You have been invited to a meeting by " + data.yourEmail + ":\\n\\n" + details});\n\n  return ContentService.createTextOutput(JSON.stringify({status:"success",eventId:event.getId()})).setMimeType(ContentService.MimeType.JSON);\n}\n\nfunction addContactToSheet(data) {\n  var ss = SpreadsheetApp.getActiveSpreadsheet();\n  var sheet = ss.getSheetByName(CONTACTS_SHEET);\n  if (!sheet) {\n    sheet = ss.insertSheet(CONTACTS_SHEET);\n    sheet.appendRow(["Name","Email"]);\n    sheet.getRange(1,1,1,2).setFontWeight("bold");\n  }\n  var values = sheet.getDataRange().getValues();\n  for (var i = 1; i < values.length; i++) {\n    if (values[i][1] === data.email) {\n      sheet.getRange(i+1,1).setValue(data.name);\n      return ContentService.createTextOutput(JSON.stringify({status:"success",message:"Updated"})).setMimeType(ContentService.MimeType.JSON);\n    }\n  }\n  sheet.appendRow([data.name, data.email]);\n  return ContentService.createTextOutput(JSON.stringify({status:"success",message:"Added"})).setMimeType(ContentService.MimeType.JSON);\n}\n\nfunction deleteContactFromSheet(data) {\n  var ss = SpreadsheetApp.getActiveSpreadsheet();\n  var sheet = ss.getSheetByName(CONTACTS_SHEET);\n  if (!sheet) return ContentService.createTextOutput(JSON.stringify({status:"error"})).setMimeType(ContentService.MimeType.JSON);\n  var values = sheet.getDataRange().getValues();\n  for (var i = values.length-1; i >= 1; i--) {\n    if (values[i][1] === data.email) sheet.deleteRow(i+1);\n  }\n  return ContentService.createTextOutput(JSON.stringify({status:"success"})).setMimeType(ContentService.MimeType.JSON);\n}\n\nfunction syncContactsToSheet(data) {\n  var ss = SpreadsheetApp.getActiveSpreadsheet();\n  var sheet = ss.getSheetByName(CONTACTS_SHEET);\n  if (!sheet) {\n    sheet = ss.insertSheet(CONTACTS_SHEET);\n    sheet.appendRow(["Name","Email"]);\n    sheet.getRange(1,1,1,2).setFontWeight("bold");\n  }\n  var lastRow = sheet.getLastRow();\n  if (lastRow > 1) sheet.deleteRows(2, lastRow-1);\n  var contacts = data.contacts || [];\n  for (var i = 0; i < contacts.length; i++) {\n    sheet.appendRow([contacts[i].name, contacts[i].email]);\n  }\n  return ContentService.createTextOutput(JSON.stringify({status:"success"})).setMimeType(ContentService.MimeType.JSON);\n}\n\nfunction doGet(e) {\n  var ss = SpreadsheetApp.getActiveSpreadsheet();\n  var result = {contacts:[], meetings:[]};\n  var cs = ss.getSheetByName(CONTACTS_SHEET);\n  if (cs) {\n    var cd = cs.getDataRange().getValues();\n    for (var i=1;i<cd.length;i++) { if(cd[i][0]&&cd[i][1]) result.contacts.push({name:cd[i][0],email:cd[i][1]}); }\n  }\n  var ms = ss.getSheetByName(SHEET_NAME);\n  if (ms) {\n    var md = ms.getDataRange().getValues();\n    var h = md[0];\n    for (var i=1;i<md.length;i++) { var o={}; for(var j=0;j<h.length;j++) o[h[j]]=md[i][j]; result.meetings.push(o); }\n  }\n  return ContentService.createTextOutput(JSON.stringify(result)).setMimeType(ContentService.MimeType.JSON);\n}';
+var GAS_CODE = 'const SHEET_NAME = "Meetings";\nconst CONTACTS_SHEET = "Contacts";\n\nfunction doPost(e) {\n  try {\n    var data = JSON.parse(e.postData.contents);\n    var action = data.action || "schedule";\n    if (action === "schedule") return scheduleMeeting(data);\n    if (action === "addContact") return addContactToSheet(data);\n    if (action === "deleteContact") return deleteContactFromSheet(data);\n    if (action === "syncContacts") return syncContactsToSheet(data);\n    return ContentService.createTextOutput(JSON.stringify({status:"error",message:"Unknown action"})).setMimeType(ContentService.MimeType.JSON);\n  } catch (error) {\n    return ContentService.createTextOutput(JSON.stringify({status:"error",message:error.toString()})).setMimeType(ContentService.MimeType.JSON);\n  }\n}\n\nfunction scheduleMeeting(data) {\n  var ss = SpreadsheetApp.getActiveSpreadsheet();\n  var sheet = ss.getSheetByName(SHEET_NAME);\n  if (!sheet) {\n    sheet = ss.insertSheet(SHEET_NAME);\n    sheet.appendRow(["Timestamp","Title","Date","Time","Duration","Your Email","Guest Name","Guest Email","Description","Status"]);\n    sheet.getRange(1,1,1,10).setFontWeight("bold");\n  }\n  sheet.appendRow([new Date().toISOString(), data.title, data.date, data.time, data.duration, data.yourEmail, data.guestName||"", data.guestEmail, data.description||"", "Scheduled"]);\n\n  var startTime = new Date(data.date + "T" + data.time + ":00");\n  var endTime = new Date(startTime.getTime() + parseInt(data.duration)*60000);\n\n  var event = CalendarApp.getDefaultCalendar().createEvent(data.title, startTime, endTime, {\n    description: (data.description||"") + "\\n\\nScheduled via Voice Meeting Scheduler",\n    guests: data.guestEmail,\n    sendInvites: true\n  });\n\n  var details = "Meeting: " + data.title + "\\nDate: " + data.date + "\\nTime: " + data.time + "\\nDuration: " + data.duration + " minutes\\nGuest: " + (data.guestName||data.guestEmail) + "\\nDescription: " + (data.description||"") + "\\n\\nCalendar event created.";\n\n  MailApp.sendEmail({to: data.yourEmail, subject: "Meeting Scheduled: " + data.title, body: details});\n  MailApp.sendEmail({to: data.guestEmail, subject: "Meeting Invitation: " + data.title, body: "You have been invited to a meeting by " + data.yourEmail + ":\\n\\n" + details});\n\n  return ContentService.createTextOutput(JSON.stringify({status:"success",eventId:event.getId()})).setMimeType(ContentService.MimeType.JSON);\n}\n\nfunction addContactToSheet(data) {\n  var ss = SpreadsheetApp.getActiveSpreadsheet();\n  var sheet = ss.getSheetByName(CONTACTS_SHEET);\n  if (!sheet) {\n    sheet = ss.insertSheet(CONTACTS_SHEET);\n    sheet.appendRow(["Name","Email"]);\n    sheet.getRange(1,1,1,2).setFontWeight("bold");\n  }\n  var values = sheet.getDataRange().getValues();\n  for (var i = 1; i < values.length; i++) {\n    if (values[i][1] === data.email) {\n      sheet.getRange(i+1,1).setValue(data.name);\n      return ContentService.createTextOutput(JSON.stringify({status:"success",message:"Updated"})).setMimeType(ContentService.MimeType.JSON);\n    }\n  }\n  sheet.appendRow([data.name, data.email]);\n  return ContentService.createTextOutput(JSON.stringify({status:"success",message:"Added"})).setMimeType(ContentService.MimeType.JSON);\n}\n\nfunction deleteContactFromSheet(data) {\n  var ss = SpreadsheetApp.getActiveSpreadsheet();\n  var sheet = ss.getSheetByName(CONTACTS_SHEET);\n  if (!sheet) return ContentService.createTextOutput(JSON.stringify({status:"error"})).setMimeType(ContentService.MimeType.JSON);\n  var values = sheet.getDataRange().getValues();\n  for (var i = values.length-1; i >= 1; i--) {\n    if (values[i][1] === data.email) sheet.deleteRow(i+1);\n  }\n  return ContentService.createTextOutput(JSON.stringify({status:"success"})).setMimeType(ContentService.MimeType.JSON);\n}\n\nfunction syncContactsToSheet(data) {\n  var ss = SpreadsheetApp.getActiveSpreadsheet();\n  var sheet = ss.getSheetByName(CONTACTS_SHEET);\n  if (!sheet) {\n    sheet = ss.insertSheet(CONTACTS_SHEET);\n    sheet.appendRow(["Name","Email"]);\n    sheet.getRange(1,1,1,2).setFontWeight("bold");\n  }\n  var lastRow = sheet.getLastRow();\n  if (lastRow > 1) sheet.deleteRows(2, lastRow-1);\n  var contacts = data.contacts || [];\n  for (var i = 0; i < contacts.length; i++) {\n    sheet.appendRow([contacts[i].name, contacts[i].email]);\n  }\n  return ContentService.createTextOutput(JSON.stringify({status:"success"})).setMimeType(ContentService.MimeType.JSON);\n}\n\nfunction doGet(e) {\n  var ss = SpreadsheetApp.getActiveSpreadsheet();\n  var result = {contacts:[], meetings:[]};\n  var cs = ss.getSheetByName(CONTACTS_SHEET);\n  if (cs) {\n    var cd = cs.getDataRange().getValues();\n    for (var i=1;i<cd.length;i++) { if(cd[i][0]&&cd[i][1]) result.contacts.push({name:cd[i][0],email:cd[i][1]}); }\n  }\n  var ms = ss.getSheetByName(SHEET_NAME);\n  if (ms) {\n    var md = ms.getDataRange().getValues();\n    var h = md[0];\n    for (var i=1;i<md.length;i++) { var o={}; for(var j=0;j<h.length;j++) o[h[j]]=md[i][j]; result.meetings.push(o); }\n  }\n  return ContentService.createTextOutput(JSON.stringify(result)).setMimeType(ContentService.MimeType.JSON);\n}';
 
 /* ===== UTILITIES ===== */
 function lg(k) { try { return JSON.parse(localStorage.getItem(AK + k)); } catch(e) { return null; } }
@@ -722,9 +722,9 @@ function parseText(text) {
         if (nm && nm[1].trim()) r.guestName = capWords(nm[1].trim());
     }
 
-    var tm = t.match(/\b(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b/i);
-    if (tm) {
-        var h = parseInt(tm[1]), m = tm[2] ? parseInt(tm[2]) : 0, ap = tm[3].toLowerCase();
+    var tm = t.match(/\b(\d{1,2})(?::(\d{2}))?\s*(a\.?m\.?|p\.?m\.?)\b/i);
+    if (tm && tm[3]) {
+        var h = parseInt(tm[1]), m = tm[2] ? parseInt(tm[2]) : 0, ap = tm[3].toLowerCase().replace(/\./g, '');
         if (ap === 'pm' && h !== 12) h += 12;
         if (ap === 'am' && h === 12) h = 0;
         r.time = String(h).padStart(2,'0') + ':' + String(m).padStart(2,'0');
@@ -757,7 +757,7 @@ function parseText(text) {
     if (r.guestName) r.title = 'Meeting with ' + r.guestName;
     else if (r.guestEmail) r.title = 'Voice Meeting';
     else if (/\bmeeting\b/i.test(t)) r.title = 'Voice Meeting';
-    else r.title = capWords(t.replace(/\bat\b.*/i,'').trim()) || 'Scheduled Event';
+    else r.title = 'Scheduled Meeting';
 
     return r;
 }
@@ -768,30 +768,37 @@ function doParse() {
     if (!text) { toast('Type or speak meeting details first', 'warn'); return; }
     stopMic();
 
-    var d = parseText(text);
-    var yourEmail = lg('email') || '';
+    try {
+        var d = parseText(text);
+        var yourEmail = lg('email') || '';
 
-    var cFound = null;
-    if (d.guestName && !d.guestEmail) {
-        cFound = findContact(d.guestName);
-        if (cFound) d.guestEmail = cFound.email;
-    }
-    if (d.guestEmail && !d.guestName) {
-        var list = getCt();
-        for (var i = 0; i < list.length; i++) {
-            if (list[i].email.toLowerCase() === d.guestEmail.toLowerCase()) { d.guestName = list[i].name; break; }
+        var cFound = null;
+        if (d.guestName && !d.guestEmail) {
+            cFound = findContact(d.guestName);
+            if (cFound) d.guestEmail = cFound.email;
         }
+        if (d.guestEmail && !d.guestName) {
+            var list = getCt();
+            for (var i = 0; i < list.length; i++) {
+                if (list[i].email.toLowerCase() === d.guestEmail.toLowerCase()) { d.guestName = list[i].name; break; }
+            }
+        }
+
+        preview = {
+            title: d.title, date: d.date, time: d.time, duration: d.duration,
+            guestName: d.guestName, guestEmail: d.guestEmail,
+            yourEmail: yourEmail, note: d.note, found: !!cFound
+        };
+
+        console.log('Preview data:', preview);
+        drawPreview();
+        document.getElementById('previewCard').style.display = 'block';
+        document.getElementById('previewCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
+        toast('Meeting details parsed successfully');
+    } catch (err) {
+        console.error('Parse error:', err);
+        toast('Error parsing meeting details: ' + err.message, 'err');
     }
-
-    preview = {
-        title: d.title, date: d.date, time: d.time, duration: d.duration,
-        guestName: d.guestName, guestEmail: d.guestEmail,
-        yourEmail: yourEmail, note: d.note, found: !!cFound
-    };
-
-    drawPreview();
-    document.getElementById('previewCard').style.display = 'block';
-    document.getElementById('previewCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 function drawPreview() {
@@ -821,7 +828,7 @@ function drawPreview() {
         guestH = '<div><span class="pv-val missing"><i class="fa-solid fa-triangle-exclamation" style="margin-right:4px;font-size:11px"></i>' + d.guestName + ' &mdash; email not found in contacts</span>' +
             '<div style="display:flex;gap:6px;margin-top:8px"><input id="pvEmail" class="input-field" style="max-width:260px;font-size:13px" placeholder="Enter email for ' + d.guestName + '"><button class="btn btn-green btn-sm" onclick="addPvEmail()">Add</button></div></div>';
     } else {
-        guestH = '<span class="pv-val" style="color:var(--text3)">No guest &mdash; personal reminder</span>';
+        guestH = '<span class="pv-val" style="color:var(--text2)"><i class="fa-solid fa-check-circle" style="margin-right:4px;font-size:11px;color:var(--accent)"></i>No guest &mdash; personal reminder</span>';
     }
 
     var yourH = d.yourEmail ? '<span class="pv-val">' + d.yourEmail + '</span>' : '<span class="pv-val missing">Set in Settings</span>';
@@ -836,8 +843,6 @@ function drawPreview() {
     if (d.note) h += pvRow('Note', '<span style="color:var(--text3)">' + d.note + '</span>', true);
 
     document.getElementById('previewBody').innerHTML = h;
-
-    /* ── FIX: guest is now optional ── only require yourEmail + date + time */
     document.getElementById('confirmBtn').disabled = !(d.yourEmail && d.date && d.time);
 }
 
@@ -868,8 +873,7 @@ function doEdit() {
 /* ===== CONFIRM ===== */
 function doConfirm() {
     var d = preview;
-    /* ── FIX: guest email is now optional ── */
-    if (!d || !d.yourEmail) { toast('Missing your email — set it in Settings', 'err'); return; }
+    if (!d || !d.yourEmail) { toast('Missing your email - set it in Settings', 'err'); return; }
 
     var btn = document.getElementById('confirmBtn');
     btn.disabled = true;
@@ -878,7 +882,7 @@ function doConfirm() {
     var payload = {
         action: 'schedule',
         title: d.title, date: d.date, time: d.time, duration: d.duration,
-        yourEmail: d.yourEmail, guestName: d.guestName || '', guestEmail: d.guestEmail || '',
+        yourEmail: d.yourEmail, guestName: d.guestName || '', guestEmail: d.guestEmail,
         description: d.note || ''
     };
 
@@ -920,8 +924,7 @@ function makeICS(d) {
     var eho = eh + Math.floor(em / 60);
     var emo = em % 60;
     var de = d.date.replace(/-/g,'') + 'T' + String(eho).padStart(2,'0') + String(emo).padStart(2,'0') + '00';
-    var attendee = d.guestEmail ? '\r\nATTENDEE:mailto:' + d.guestEmail : '';
-    var ics = 'BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//VMS//EN\r\nBEGIN:VEVENT\r\nDTSTART:' + ds + '\r\nDTEND:' + de + '\r\nSUMMARY:' + d.title + '\r\nDESCRIPTION:' + (d.description||'') + attendee + '\r\nORGANIZER:mailto:' + d.yourEmail + '\r\nEND:VEVENT\r\nEND:VCALENDAR';
+    var ics = 'BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//VMS//EN\r\nBEGIN:VEVENT\r\nDTSTART:' + ds + '\r\nDTEND:' + de + '\r\nSUMMARY:' + d.title + '\r\nDESCRIPTION:' + (d.description||'') + '\r\nATTENDEE:mailto:' + d.guestEmail + '\r\nORGANIZER:mailto:' + d.yourEmail + '\r\nEND:VEVENT\r\nEND:VCALENDAR';
     var blob = new Blob([ics], { type: 'text/calendar' });
     var u = URL.createObjectURL(blob);
     var a = document.createElement('a');
@@ -935,7 +938,7 @@ function showResult(d, synced) {
     var dt = new Date(d.date + 'T' + d.time);
     var dateStr = dt.toLocaleDateString('en-US', { weekday:'short', month:'short', day:'numeric' });
     var timeStr = dt.toLocaleTimeString('en-US', { hour:'numeric', minute:'2-digit' });
-    var guest = d.guestName ? d.guestName + ' (' + d.guestEmail + ')' : (d.guestEmail || 'No guest');
+    var guest = d.guestName ? d.guestName + ' (' + d.guestEmail + ')' : d.guestEmail;
     var label = synced ? 'Scheduled & Synced' : 'Scheduled Locally';
     var desc = synced ? 'Saved to Sheet, Calendar created, Emails sent' : 'Configure Apps Script for auto-sync';
 
@@ -979,7 +982,7 @@ function drawMt() {
         var dt = new Date(m.date + 'T' + m.time);
         var ds = dt.toLocaleDateString('en-US', { month:'short', day:'numeric' });
         var ts = dt.toLocaleTimeString('en-US', { hour:'numeric', minute:'2-digit' });
-        var gn = m.guestName || m.guestEmail || 'No guest';
+        var gn = m.guestName || m.guestEmail || 'Unknown';
         h += '<div class="mt-item"><div style="display:flex;justify-content:space-between;align-items:center"><span style="font-size:13px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1">' + m.title + '</span><span style="font-size:11px;color:var(--text3);white-space:nowrap;margin-left:6px">' + ds + ' ' + ts + '</span></div><div style="font-size:11px;color:var(--text3);margin-top:2px"><i class="fa-solid fa-user" style="font-size:9px;margin-right:3px"></i>' + gn + ' &middot; ' + m.duration + 'm</div></div>';
     }
     box.innerHTML = h;
