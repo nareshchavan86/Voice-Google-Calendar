@@ -4,853 +4,1018 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Voice Meeting Scheduler</title>
-    <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
     <style>
-        :root{--bg:#0a0e17;--card:#111827;--accent:#10b981;--accent-glow:rgba(16,185,129,0.25);--secondary:#f59e0b;--text:#e2e8f0;--muted:#64748b;--border:#1e293b;--danger:#ef4444;--success:#34d399}
-        *{box-sizing:border-box;margin:0;padding:0}
-        body{font-family:'Space Grotesk',sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
-        .bg-grid{position:fixed;inset:0;z-index:0;pointer-events:none;background-image:radial-gradient(rgba(16,185,129,0.05) 1px,transparent 1px);background-size:28px 28px}
-        .bg-blob{position:fixed;border-radius:50%;filter:blur(120px);opacity:.12;z-index:0;pointer-events:none;animation:bf 25s ease-in-out infinite}
-        @keyframes bf{0%,100%{transform:translate(0,0) scale(1)}33%{transform:translate(30px,-40px) scale(1.08)}66%{transform:translate(-25px,25px) scale(.94)}}
-        .gc{background:rgba(17,24,39,.75);backdrop-filter:blur(16px);border:1px solid var(--border);border-radius:16px;transition:border-color .3s}
-        .gc:hover{border-color:rgba(16,185,129,.2)}
-        .mic-btn{width:100px;height:100px;border-radius:50%;border:none;cursor:pointer;background:linear-gradient(135deg,var(--accent),#059669);display:flex;align-items:center;justify-content:center;position:relative;transition:all .3s;box-shadow:0 0 30px var(--accent-glow)}
-        .mic-btn:hover{transform:scale(1.06);box-shadow:0 0 50px var(--accent-glow)}
-        .mic-btn.active{animation:mp 1.5s ease-in-out infinite}
-        .mic-btn.active::before,.mic-btn.active::after{content:'';position:absolute;border-radius:50%;border:2px solid var(--accent);animation:mr 1.8s ease-out infinite}
-        .mic-btn.active::before{width:130%;height:130%}
-        .mic-btn.active::after{width:160%;height:160%;animation-delay:.6s;border-width:1px}
-        @keyframes mp{0%,100%{box-shadow:0 0 30px var(--accent-glow)}50%{box-shadow:0 0 60px var(--accent-glow),0 0 100px rgba(16,185,129,.1)}}
-        @keyframes mr{0%{opacity:1;transform:scale(1)}100%{opacity:0;transform:scale(1.4)}}
-        .wf{display:flex;align-items:center;justify-content:center;gap:3px;height:36px}
-        .wb{width:4px;height:6px;background:var(--accent);border-radius:2px;transition:height .15s}
-        .wf.on .wb{animation:wa .6s ease-in-out infinite alternate}
-        .wf.on .wb:nth-child(1){animation-delay:0s}.wf.on .wb:nth-child(2){animation-delay:.08s}
-        .wf.on .wb:nth-child(3){animation-delay:.16s}.wf.on .wb:nth-child(4){animation-delay:.24s}
-        .wf.on .wb:nth-child(5){animation-delay:.32s}.wf.on .wb:nth-child(6){animation-delay:.24s}
-        .wf.on .wb:nth-child(7){animation-delay:.16s}.wf.on .wb:nth-child(8){animation-delay:.08s}
-        .wf.on .wb:nth-child(9){animation-delay:0s}
-        @keyframes wa{0%{height:6px}100%{height:30px}}
-        .fi{background:rgba(10,14,23,.8);border:1px solid var(--border);border-radius:10px;padding:10px 14px;color:var(--text);font-family:inherit;font-size:14px;width:100%;outline:none;transition:all .3s}
-        .fi:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-glow)}
-        .fi::placeholder{color:var(--muted)}
-        select.fi{appearance:none;cursor:pointer;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%2364748b' viewBox='0 0 16 16'%3E%3Cpath d='M8 11L3 6h10z'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center}
-        .bp{background:linear-gradient(135deg,var(--accent),#059669);color:#fff;font-weight:600;padding:11px 28px;border-radius:10px;border:none;cursor:pointer;font-family:inherit;font-size:14px;transition:all .3s}
-        .bp:hover{transform:translateY(-1px);box-shadow:0 4px 24px var(--accent-glow)}
-        .bp:disabled{opacity:.5;cursor:not-allowed;transform:none;box-shadow:none}
-        .bs{background:transparent;color:var(--muted);font-weight:500;padding:10px 20px;border-radius:10px;border:1px solid var(--border);cursor:pointer;font-family:inherit;font-size:13px;transition:all .3s}
-        .bs:hover{border-color:var(--muted);color:var(--text)}
-        .bi{width:34px;height:34px;border-radius:8px;border:1px solid var(--border);background:transparent;color:var(--muted);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .2s;font-size:13px}
-        .bi:hover{border-color:var(--accent);color:var(--accent);background:rgba(16,185,129,.08)}
-        .bi.danger:hover{border-color:var(--danger);color:var(--danger);background:rgba(239,68,68,.08)}
-        #toast-box{position:fixed;top:20px;right:20px;z-index:9999;display:flex;flex-direction:column;gap:8px}
-        .toast{padding:14px 20px;border-radius:12px;font-size:14px;font-weight:500;transform:translateX(120%);transition:transform .4s cubic-bezier(.34,1.56,.64,1);max-width:380px;backdrop-filter:blur(16px)}
-        .toast.show{transform:translateX(0)}
-        .toast-ok{background:rgba(16,185,129,.15);border:1px solid rgba(16,185,129,.3);color:#34d399}
-        .toast-err{background:rgba(239,68,68,.15);border:1px solid rgba(239,68,68,.3);color:#fca5a5}
-        .toast-warn{background:rgba(245,158,11,.15);border:1px solid rgba(245,158,11,.3);color:#fcd34d}
-        .modal-bg{position:fixed;inset:0;background:rgba(0,0,0,.7);backdrop-filter:blur(6px);z-index:5000;display:flex;align-items:flex-start;justify-content:center;padding-top:30px;opacity:0;pointer-events:none;transition:opacity .3s;overflow-y:auto}
-        .modal-bg.open{opacity:1;pointer-events:all}
-        .modal-box{background:var(--card);border:1px solid var(--border);border-radius:20px;padding:28px 32px;max-width:720px;width:92%;margin-bottom:40px;transform:scale(.92) translateY(16px);transition:transform .3s}
-        .modal-bg.open .modal-box{transform:scale(1) translateY(0)}
-        .code-blk{background:#070a10;border:1px solid var(--border);border-radius:10px;padding:16px;font-family:'JetBrains Mono',monospace;font-size:11px;line-height:1.6;overflow-x:auto;white-space:pre;color:#a5f3fc;max-height:400px;overflow-y:auto}
-        .preview-row{display:flex;align-items:flex-start;gap:10px;padding:8px 0;border-bottom:1px solid rgba(30,39,59,.5)}
-        .preview-row:last-child{border-bottom:none}
-        .preview-label{color:var(--muted);font-size:13px;min-width:80px;padding-top:2px}
-        .preview-value{color:var(--text);font-size:14px;font-weight:500;flex:1}
-        .preview-value.found{color:var(--success)}
-        .preview-value.notfound{color:var(--secondary)}
-        .contact-item{display:flex;align-items:center;gap:10px;padding:10px 14px;background:rgba(10,14,23,.5);border-radius:10px;border:1px solid transparent;transition:all .2s}
-        .contact-item:hover{border-color:var(--border);background:rgba(10,14,23,.8)}
-        .contact-avatar{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:14px;flex-shrink:0}
-        .meet-item{padding:10px 14px;background:rgba(10,14,23,.5);border-radius:10px;border:1px solid transparent;transition:all .2s}
-        .meet-item:hover{border-color:var(--border)}
-        .setup-banner{background:linear-gradient(135deg,rgba(245,158,11,.1),rgba(245,158,11,.05));border:1px solid rgba(245,158,11,.3);border-radius:12px;padding:14px 20px;display:flex;align-items:center;gap:12px;cursor:pointer;transition:all .3s}
-        .setup-banner:hover{background:linear-gradient(135deg,rgba(245,158,11,.15),rgba(245,158,11,.08));border-color:rgba(245,158,11,.5)}
-        .step-num{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;flex-shrink:0;background:linear-gradient(135deg,var(--accent),#059669);color:#fff}
-        .spin{width:18px;height:18px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:sp .7s linear infinite;display:inline-block}
-        @keyframes sp{to{transform:rotate(360deg)}}
-        @keyframes fadeUp{from{opacity:0;transform:translateY(18px)}to{opacity:1;transform:translateY(0)}}
-        .fu{animation:fadeUp .5s ease-out forwards}
-        .d1{animation-delay:.05s;opacity:0}.d2{animation-delay:.12s;opacity:0}.d3{animation-delay:.2s;opacity:0}.d4{animation-delay:.28s;opacity:0}
-        ::-webkit-scrollbar{width:5px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px}
-        .sdot{width:7px;height:7px;border-radius:50%;display:inline-block}
-        .sdot-on{background:var(--accent);box-shadow:0 0 6px var(--accent-glow)}
-        .sdot-off{background:var(--danger)}
-        @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;transition-duration:.01ms!important}}
-        @media(max-width:640px){.mic-btn{width:80px;height:80px}.mic-btn i{font-size:24px!important}}
+        :root {
+            --bg: #080c14;
+            --card: #0f1623;
+            --card2: #151d2e;
+            --accent: #00d68f;
+            --accent2: #00b377;
+            --accent-glow: rgba(0,214,143,0.2);
+            --warn: #ffb020;
+            --warn-glow: rgba(255,176,32,0.15);
+            --text: #e8edf5;
+            --text2: #a0aec0;
+            --text3: #5a6a85;
+            --border: #1c2740;
+            --danger: #ff4757;
+            --success: #00d68f;
+        }
+        *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: 'Space Grotesk', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            line-height: 1.5;
+        }
+        a { color: var(--accent); }
+
+        /* Background */
+        .page-bg {
+            position: fixed; inset: 0; z-index: 0; pointer-events: none;
+            background-image: radial-gradient(rgba(0,214,143,0.04) 1px, transparent 1px);
+            background-size: 32px 32px;
+        }
+        .page-bg::before {
+            content: ''; position: absolute; width: 600px; height: 600px;
+            top: -200px; right: -150px; border-radius: 50%;
+            background: var(--accent); filter: blur(150px); opacity: 0.07;
+        }
+        .page-bg::after {
+            content: ''; position: absolute; width: 400px; height: 400px;
+            bottom: -100px; left: -100px; border-radius: 50%;
+            background: var(--warn); filter: blur(140px); opacity: 0.06;
+        }
+
+        /* Layout */
+        .container { position: relative; z-index: 1; max-width: 960px; margin: 0 auto; padding: 24px 16px; }
+
+        /* Card */
+        .card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            padding: 24px;
+            margin-bottom: 20px;
+        }
+
+        /* Mic Button */
+        .mic-wrap { text-align: center; padding: 32px 0; }
+        .mic-circle {
+            width: 96px; height: 96px; border-radius: 50%; border: none; cursor: pointer;
+            background: linear-gradient(135deg, var(--accent), var(--accent2));
+            display: inline-flex; align-items: center; justify-content: center;
+            box-shadow: 0 0 40px var(--accent-glow);
+            transition: transform 0.2s, box-shadow 0.2s;
+            position: relative;
+        }
+        .mic-circle:hover { transform: scale(1.05); box-shadow: 0 0 60px var(--accent-glow); }
+        .mic-circle.on { animation: pulse-glow 1.5s ease-in-out infinite; }
+        .mic-circle.on::before, .mic-circle.on::after {
+            content: ''; position: absolute; border-radius: 50%;
+            border: 2px solid var(--accent); animation: ring-out 2s ease-out infinite;
+        }
+        .mic-circle.on::before { width: 130%; height: 130%; }
+        .mic-circle.on::after { width: 160%; height: 160%; animation-delay: 0.5s; }
+        @keyframes pulse-glow {
+            0%,100% { box-shadow: 0 0 40px var(--accent-glow); }
+            50% { box-shadow: 0 0 80px var(--accent-glow); }
+        }
+        @keyframes ring-out {
+            0% { opacity: 1; transform: scale(1); }
+            100% { opacity: 0; transform: scale(1.5); }
+        }
+
+        /* Waveform */
+        .wave-row { display: flex; justify-content: center; gap: 3px; height: 32px; margin: 12px 0; }
+        .wave-bar {
+            width: 4px; height: 6px; background: var(--accent); border-radius: 2px;
+        }
+        .wave-row.on .wave-bar { animation: wave-jump 0.5s ease-in-out infinite alternate; }
+        .wave-row.on .wave-bar:nth-child(1) { animation-delay: 0s; }
+        .wave-row.on .wave-bar:nth-child(2) { animation-delay: 0.07s; }
+        .wave-row.on .wave-bar:nth-child(3) { animation-delay: 0.14s; }
+        .wave-row.on .wave-bar:nth-child(4) { animation-delay: 0.21s; }
+        .wave-row.on .wave-bar:nth-child(5) { animation-delay: 0.28s; }
+        .wave-row.on .wave-bar:nth-child(6) { animation-delay: 0.21s; }
+        .wave-row.on .wave-bar:nth-child(7) { animation-delay: 0.14s; }
+        .wave-row.on .wave-bar:nth-child(8) { animation-delay: 0.07s; }
+        .wave-row.on .wave-bar:nth-child(9) { animation-delay: 0s; }
+        @keyframes wave-jump { from { height: 6px; } to { height: 28px; } }
+
+        /* Form elements */
+        .input-field {
+            width: 100%; padding: 10px 14px; font-size: 14px;
+            font-family: inherit; color: var(--text);
+            background: var(--bg); border: 1px solid var(--border);
+            border-radius: 8px; outline: none; transition: border-color 0.2s;
+        }
+        .input-field:focus { border-color: var(--accent); }
+        .input-field::placeholder { color: var(--text3); }
+        select.input-field { appearance: none; cursor: pointer; }
+        textarea.input-field { resize: vertical; min-height: 70px; }
+
+        .btn {
+            display: inline-flex; align-items: center; gap: 6px;
+            padding: 10px 22px; border-radius: 8px; border: none;
+            font-family: inherit; font-size: 14px; font-weight: 600;
+            cursor: pointer; transition: transform 0.15s, box-shadow 0.15s;
+        }
+        .btn:active { transform: scale(0.97); }
+        .btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+        .btn-green {
+            background: linear-gradient(135deg, var(--accent), var(--accent2));
+            color: #fff; box-shadow: 0 2px 16px var(--accent-glow);
+        }
+        .btn-green:hover:not(:disabled) { box-shadow: 0 4px 24px var(--accent-glow); transform: translateY(-1px); }
+        .btn-ghost {
+            background: transparent; color: var(--text2);
+            border: 1px solid var(--border);
+        }
+        .btn-ghost:hover { border-color: var(--text3); color: var(--text); }
+        .btn-sm { padding: 7px 14px; font-size: 13px; }
+        .btn-icon-only {
+            width: 32px; height: 32px; padding: 0; border-radius: 6px;
+            border: 1px solid var(--border); background: transparent;
+            color: var(--text3); cursor: pointer; display: inline-flex;
+            align-items: center; justify-content: center; font-size: 13px;
+            transition: all 0.2s;
+        }
+        .btn-icon-only:hover { border-color: var(--accent); color: var(--accent); }
+        .btn-icon-only.red:hover { border-color: var(--danger); color: var(--danger); }
+
+        /* Preview rows */
+        .pv-row { display: flex; gap: 12px; padding: 8px 0; border-bottom: 1px solid rgba(28,39,64,0.5); }
+        .pv-row:last-child { border-bottom: none; }
+        .pv-label { color: var(--text3); font-size: 13px; min-width: 90px; padding-top: 2px; }
+        .pv-val { font-size: 14px; font-weight: 500; flex: 1; }
+        .pv-val.ok { color: var(--success); }
+        .pv-val.missing { color: var(--warn); }
+
+        /* Contact list */
+        .ct-item {
+            display: flex; align-items: center; gap: 10px;
+            padding: 10px 12px; border-radius: 8px;
+            background: var(--card2); transition: background 0.2s;
+        }
+        .ct-item:hover { background: rgba(28,39,64,0.6); }
+        .ct-avatar {
+            width: 34px; height: 34px; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            font-weight: 700; font-size: 13px; flex-shrink: 0;
+        }
+
+        /* Meeting list */
+        .mt-item { padding: 10px 12px; border-radius: 8px; background: var(--card2); }
+
+        /* Setup banner */
+        .setup-bar {
+            display: flex; align-items: center; gap: 12px; padding: 14px 18px;
+            background: var(--warn-glow); border: 1px solid rgba(255,176,32,0.3);
+            border-radius: 10px; cursor: pointer; transition: background 0.2s;
+        }
+        .setup-bar:hover { background: rgba(255,176,32,0.12); }
+
+        /* Modal */
+        .modal-overlay {
+            position: fixed; inset: 0; background: rgba(0,0,0,0.7);
+            backdrop-filter: blur(4px); z-index: 9000;
+            display: none; align-items: flex-start; justify-content: center;
+            padding: 40px 16px; overflow-y: auto;
+        }
+        .modal-overlay.visible { display: flex; }
+        .modal-panel {
+            background: var(--card); border: 1px solid var(--border);
+            border-radius: 16px; padding: 28px; width: 100%; max-width: 680px;
+            margin-bottom: 40px;
+        }
+        .modal-panel h2 { font-size: 20px; font-weight: 700; margin-bottom: 20px; }
+
+        .code-box {
+            background: #060a10; border: 1px solid var(--border); border-radius: 8px;
+            padding: 14px; font-family: 'JetBrains Mono', monospace; font-size: 11px;
+            line-height: 1.6; white-space: pre; color: #7dd3fc;
+            max-height: 360px; overflow: auto;
+        }
+
+        .step-badge {
+            display: inline-flex; align-items: center; justify-content: center;
+            width: 26px; height: 26px; border-radius: 50%; flex-shrink: 0;
+            background: var(--accent); color: #fff; font-weight: 700; font-size: 13px;
+        }
+
+        /* Toast */
+        .toast-area { position: fixed; top: 16px; right: 16px; z-index: 99999; }
+        .toast-msg {
+            padding: 12px 18px; border-radius: 10px; font-size: 14px; font-weight: 500;
+            margin-bottom: 8px; max-width: 360px;
+            animation: toast-in 0.3s ease-out;
+        }
+        .toast-msg.t-ok { background: rgba(0,214,143,0.15); border: 1px solid rgba(0,214,143,0.3); color: var(--success); }
+        .toast-msg.t-err { background: rgba(255,71,87,0.15); border: 1px solid rgba(255,71,87,0.3); color: #ff6b7a; }
+        .toast-msg.t-warn { background: rgba(255,176,32,0.15); border: 1px solid rgba(255,176,32,0.3); color: var(--warn); }
+        @keyframes toast-in { from { opacity: 0; transform: translateX(30px); } to { opacity: 1; transform: translateX(0); } }
+
+        /* Spinner */
+        .spin-icon {
+            display: inline-block; width: 16px; height: 16px;
+            border: 2px solid rgba(255,255,255,0.3); border-top-color: #fff;
+            border-radius: 50%; animation: spin-anim 0.6s linear infinite;
+        }
+        @keyframes spin-anim { to { transform: rotate(360deg); } }
+
+        /* Status dot */
+        .dot { width: 7px; height: 7px; border-radius: 50%; display: inline-block; }
+        .dot-green { background: var(--accent); box-shadow: 0 0 6px var(--accent-glow); }
+        .dot-red { background: var(--danger); }
+
+        /* Responsive grid */
+        .grid-2 { display: grid; grid-template-columns: 1fr; gap: 20px; }
+        @media (min-width: 768px) { .grid-2 { grid-template-columns: 1fr 1fr; } }
+
+        /* Scrollbar */
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+        /* Fade in */
+        @keyframes fade-in { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+        .anim-in { animation: fade-in 0.4s ease-out both; }
     </style>
 </head>
-<body class="min-h-screen relative">
-    <div class="bg-grid"></div>
-    <div class="bg-blob" style="width:500px;height:500px;background:var(--accent);top:-120px;right:-80px"></div>
-    <div class="bg-blob" style="width:380px;height:380px;background:var(--secondary);bottom:-80px;left:-100px;animation-delay:-12s"></div>
-    <div id="toast-box"></div>
+<body>
 
-    <!-- ========== SETUP GUIDE MODAL ========== -->
-    <div id="modal-setup" class="modal-bg">
-        <div class="modal-box">
-            <div class="flex items-center justify-between mb-6">
-                <h2 class="text-xl font-bold"><i class="fa-solid fa-wand-magic-sparkles mr-2" style="color:var(--accent)"></i>Setup Guide</h2>
-                <button class="bi" onclick="closeModal('modal-setup')"><i class="fa-solid fa-xmark"></i></button>
-            </div>
-            <div class="gc p-4 mb-4">
-                <div class="flex items-start gap-3">
-                    <span class="step-num">1</span>
-                    <div><h3 class="font-semibold text-sm mb-1">Create a Google Sheet</h3><p class="text-xs" style="color:var(--muted)">Go to <a href="https://sheets.google.com" target="_blank" class="underline" style="color:var(--accent)">sheets.google.com</a> and create a new spreadsheet named "Meeting Scheduler".</p></div>
-                </div>
-            </div>
-            <div class="gc p-4 mb-4">
-                <div class="flex items-start gap-3">
-                    <span class="step-num">2</span>
-                    <div><h3 class="font-semibold text-sm mb-1">Open Apps Script</h3><p class="text-xs" style="color:var(--muted)">In the sheet menu: <strong style="color:var(--text)">Extensions &rarr; Apps Script</strong></p></div>
-                </div>
-            </div>
-            <div class="gc p-4 mb-4">
-                <div class="flex items-start gap-3">
-                    <span class="step-num">3</span>
-                    <div class="flex-1">
-                        <h3 class="font-semibold text-sm mb-1">Paste This Code</h3>
-                        <p class="text-xs mb-3" style="color:var(--muted)">Delete everything in the editor, then paste:</p>
-                        <div class="relative">
-                            <button class="bi absolute top-2 right-2 z-10" onclick="copyScript()" title="Copy" style="background:rgba(16,185,129,.15);border-color:var(--accent);color:var(--accent)"><i class="fa-solid fa-copy" id="copy-icon"></i></button>
-                            <div class="code-blk" id="script-code">const SHEET_NAME = 'Meetings';
-const CONTACTS_SHEET = 'Contacts';
+<div class="page-bg"></div>
+<div class="toast-area" id="toastArea"></div>
 
-function doPost(e) {
-  try {
-    var data = JSON.parse(e.postData.contents);
-    var action = data.action || 'schedule';
+<!-- ===== SETUP MODAL ===== -->
+<div class="modal-overlay" id="setupModal">
+    <div class="modal-panel">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
+            <h2 style="margin:0"><i class="fa-solid fa-wand-magic-sparkles" style="color:var(--accent);margin-right:8px"></i>Setup Guide</h2>
+            <button class="btn-icon-only" onclick="hideModal('setupModal')"><i class="fa-solid fa-xmark"></i></button>
+        </div>
 
-    if (action === 'schedule') return scheduleMeeting(data);
-    if (action === 'addContact') return addContact(data);
-    if (action === 'deleteContact') return deleteContact(data);
-    if (action === 'syncContacts') return syncContacts(data);
-
-    return ContentService.createTextOutput(
-      JSON.stringify({status:'error',message:'Unknown action'})
-    ).setMimeType(ContentService.MimeType.JSON);
-  } catch (error) {
-    return ContentService.createTextOutput(
-      JSON.stringify({status:'error',message:error.toString()})
-    ).setMimeType(ContentService.MimeType.JSON);
-  }
-}
-
-function scheduleMeeting(data) {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sheet = ss.getSheetByName(SHEET_NAME);
-  if (!sheet) {
-    sheet = ss.insertSheet(SHEET_NAME);
-    sheet.appendRow(['Timestamp','Title','Date','Time','Duration','Your Email','Guest Name','Guest Email','Description','Status']);
-    sheet.getRange(1,1,1,10).setFontWeight('bold');
-  }
-  sheet.appendRow([new Date().toISOString(), data.title, data.date, data.time, data.duration, data.yourEmail, data.guestName||'', data.guestEmail, data.description||'', 'Scheduled']);
-
-  var startTime = new Date(data.date + 'T' + data.time + ':00');
-  var endTime = new Date(startTime.getTime() + parseInt(data.duration)*60000);
-
-  var event = CalendarApp.getDefaultCalendar().createEvent(data.title, startTime, endTime, {
-    description: (data.description||'') + '\n\nScheduled via Voice Meeting Scheduler',
-    guests: data.guestEmail,
-    sendInvites: true
-  });
-
-  var details = 'Meeting: ' + data.title + '\nDate: ' + data.date + '\nTime: ' + data.time + '\nDuration: ' + data.duration + ' minutes\nGuest: ' + (data.guestName||data.guestEmail) + '\nDescription: ' + (data.description||'') + '\n\nCalendar event created.';
-
-  MailApp.sendEmail({to: data.yourEmail, subject: 'Meeting Scheduled: ' + data.title, body: details});
-  MailApp.sendEmail({to: data.guestEmail, subject: 'Meeting Invitation: ' + data.title, body: 'You have been invited to a meeting by ' + data.yourEmail + ':\n\n' + details});
-
-  return ContentService.createTextOutput(JSON.stringify({status:'success',eventId:event.getId()})).setMimeType(ContentService.MimeType.JSON);
-}
-
-function addContact(data) {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sheet = ss.getSheetByName(CONTACTS_SHEET);
-  if (!sheet) {
-    sheet = ss.insertSheet(CONTACTS_SHEET);
-    sheet.appendRow(['Name','Email']);
-    sheet.getRange(1,1,1,2).setFontWeight('bold');
-  }
-  var values = sheet.getDataRange().getValues();
-  for (var i = 1; i < values.length; i++) {
-    if (values[i][1] === data.email) {
-      sheet.getRange(i+1,1).setValue(data.name);
-      return ContentService.createTextOutput(JSON.stringify({status:'success',message:'Updated'})).setMimeType(ContentService.MimeType.JSON);
-    }
-  }
-  sheet.appendRow([data.name, data.email]);
-  return ContentService.createTextOutput(JSON.stringify({status:'success',message:'Added'})).setMimeType(ContentService.MimeType.JSON);
-}
-
-function deleteContact(data) {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sheet = ss.getSheetByName(CONTACTS_SHEET);
-  if (!sheet) return ContentService.createTextOutput(JSON.stringify({status:'error'})).setMimeType(ContentService.MimeType.JSON);
-  var values = sheet.getDataRange().getValues();
-  for (var i = values.length-1; i >= 1; i--) {
-    if (values[i][1] === data.email) sheet.deleteRow(i+1);
-  }
-  return ContentService.createTextOutput(JSON.stringify({status:'success'})).setMimeType(ContentService.MimeType.JSON);
-}
-
-function syncContacts(data) {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var sheet = ss.getSheetByName(CONTACTS_SHEET);
-  if (!sheet) {
-    sheet = ss.insertSheet(CONTACTS_SHEET);
-    sheet.appendRow(['Name','Email']);
-    sheet.getRange(1,1,1,2).setFontWeight('bold');
-  }
-  var lastRow = sheet.getLastRow();
-  if (lastRow > 1) sheet.deleteRows(2, lastRow-1);
-  var contacts = data.contacts || [];
-  for (var i = 0; i < contacts.length; i++) {
-    sheet.appendRow([contacts[i].name, contacts[i].email]);
-  }
-  return ContentService.createTextOutput(JSON.stringify({status:'success'})).setMimeType(ContentService.MimeType.JSON);
-}
-
-function doGet(e) {
-  var ss = SpreadsheetApp.getActiveSpreadsheet();
-  var result = {contacts:[], meetings:[]};
-  var cs = ss.getSheetByName(CONTACTS_SHEET);
-  if (cs) {
-    var cd = cs.getDataRange().getValues();
-    for (var i=1;i<cd.length;i++) { if(cd[i][0]&&cd[i][1]) result.contacts.push({name:cd[i][0],email:cd[i][1]}); }
-  }
-  var ms = ss.getSheetByName(SHEET_NAME);
-  if (ms) {
-    var md = ms.getDataRange().getValues();
-    var h = md[0];
-    for (var i=1;i<md.length;i++) { var o={}; for(var j=0;j<h.length;j++) o[h[j]]=md[i][j]; result.meetings.push(o); }
-  }
-  return ContentService.createTextOutput(JSON.stringify(result)).setMimeType(ContentService.MimeType.JSON);
-}</div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="gc p-4 mb-4">
-                <div class="flex items-start gap-3">
-                    <span class="step-num">4</span>
-                    <div><h3 class="font-semibold text-sm mb-1">Deploy as Web App</h3>
-                        <p class="text-xs" style="color:var(--muted)"><strong style="color:var(--text)">Deploy &rarr; New deployment</strong>. Type: <strong style="color:var(--text)">Web app</strong>. Execute as: <strong style="color:var(--text)">Me</strong>. Access: <strong style="color:var(--text)">Anyone</strong>. Click Deploy and authorize.</p></div>
-                </div>
-            </div>
-            <div class="gc p-4 mb-4">
-                <div class="flex items-start gap-3">
-                    <span class="step-num">5</span>
-                    <div><h3 class="font-semibold text-sm mb-1">Copy the URL into Settings</h3><p class="text-xs" style="color:var(--muted)">After deployment, copy the <strong style="color:var(--text)">Web app URL</strong> and paste it in Settings.</p></div>
-                </div>
-            </div>
-            <div class="flex gap-3 mt-6">
-                <button class="bp text-sm" onclick="closeModal('modal-setup');openModal('modal-settings')"><i class="fa-solid fa-gear mr-1"></i> Open Settings</button>
-                <button class="bs" onclick="closeModal('modal-setup')">Close</button>
+        <div class="card" style="margin-bottom:12px;padding:16px">
+            <div style="display:flex;gap:10px;align-items:flex-start">
+                <span class="step-badge">1</span>
+                <div><strong style="font-size:14px">Create Google Sheet</strong><br><span style="font-size:12px;color:var(--text2)">Go to <a href="https://sheets.google.com" target="_blank">sheets.google.com</a> and create a new spreadsheet.</span></div>
             </div>
         </div>
-    </div>
-
-    <!-- ========== SETTINGS MODAL ========== -->
-    <div id="modal-settings" class="modal-bg">
-        <div class="modal-box" style="max-width:520px">
-            <div class="flex items-center justify-between mb-6">
-                <h2 class="text-xl font-bold"><i class="fa-solid fa-gear mr-2" style="color:var(--accent)"></i>Settings</h2>
-                <button class="bi" onclick="closeModal('modal-settings')"><i class="fa-solid fa-xmark"></i></button>
+        <div class="card" style="margin-bottom:12px;padding:16px">
+            <div style="display:flex;gap:10px;align-items:flex-start">
+                <span class="step-badge">2</span>
+                <div><strong style="font-size:14px">Open Apps Script</strong><br><span style="font-size:12px;color:var(--text2)">In the sheet: <strong>Extensions &rarr; Apps Script</strong></span></div>
             </div>
-            <div class="space-y-5">
-                <div>
-                    <label class="block text-sm font-medium mb-1.5 text-slate-300">Your Email (auto-filled in all meetings)</label>
-                    <input id="cfg-email" type="email" class="fi" placeholder="you@example.com">
-                </div>
-                <div>
-                    <label class="block text-sm font-medium mb-1.5 text-slate-300">Google Apps Script URL</label>
-                    <input id="cfg-url" type="url" class="fi font-mono text-xs" placeholder="https://script.google.com/macros/s/AKfycbxlWA7nkn3SSLkEukkSlai5Qnh1NnQ4B-gfI9zkQWVsClHYihCvziV1GvEZTFYIkWIF/exec">
-                    <div class="flex items-center gap-2 mt-1.5">
-                        <span class="sdot" id="cfg-status"></span>
-                        <span class="text-xs" id="cfg-status-text" style="color:var(--muted)">Not configured</span>
+        </div>
+        <div class="card" style="margin-bottom:12px;padding:16px">
+            <div style="display:flex;gap:10px;align-items:flex-start">
+                <span class="step-badge">3</span>
+                <div style="flex:1">
+                    <strong style="font-size:14px">Paste This Code</strong><br>
+                    <span style="font-size:12px;color:var(--text2)">Delete everything in the editor, then paste the code below:</span>
+                    <div style="position:relative;margin-top:10px">
+                        <button class="btn-icon-only" style="position:absolute;top:8px;right:8px;z-index:2;background:rgba(0,214,143,0.1);border-color:var(--accent);color:var(--accent)" onclick="copyCode()" title="Copy"><i class="fa-solid fa-copy" id="copyBtn"></i></button>
+                        <div class="code-box" id="codeBox"></div>
                     </div>
                 </div>
-                <div class="flex gap-3 pt-2">
-                    <button class="bp text-sm" onclick="saveSettings()"><i class="fa-solid fa-check mr-1"></i> Save</button>
-                    <button class="bs" onclick="closeModal('modal-settings');openModal('modal-setup')"><i class="fa-solid fa-wand-magic-sparkles mr-1"></i> Setup Guide</button>
+            </div>
+        </div>
+        <div class="card" style="margin-bottom:12px;padding:16px">
+            <div style="display:flex;gap:10px;align-items:flex-start">
+                <span class="step-badge">4</span>
+                <div><strong style="font-size:14px">Deploy as Web App</strong><br>
+                    <span style="font-size:12px;color:var(--text2)">
+                        <strong>Deploy &rarr; New deployment</strong><br>
+                        Type: <strong>Web app</strong> &middot; Execute as: <strong>Me</strong> &middot; Access: <strong>Anyone</strong><br>
+                        Click Deploy, authorize when prompted.
+                    </span>
+                </div>
+            </div>
+        </div>
+        <div class="card" style="margin-bottom:16px;padding:16px">
+            <div style="display:flex;gap:10px;align-items:flex-start">
+                <span class="step-badge">5</span>
+                <div><strong style="font-size:14px">Copy the URL into Settings</strong><br><span style="font-size:12px;color:var(--text2)">After deploying, copy the <strong>Web app URL</strong> and paste it in Settings.</span></div>
+            </div>
+        </div>
+
+        <div style="display:flex;gap:10px">
+            <button class="btn btn-green btn-sm" onclick="hideModal('setupModal');showModal('settingsModal')"><i class="fa-solid fa-gear"></i> Open Settings</button>
+            <button class="btn btn-ghost btn-sm" onclick="hideModal('setupModal')">Close</button>
+        </div>
+    </div>
+</div>
+
+<!-- ===== SETTINGS MODAL ===== -->
+<div class="modal-overlay" id="settingsModal">
+    <div class="modal-panel" style="max-width:480px">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
+            <h2 style="margin:0"><i class="fa-solid fa-gear" style="color:var(--accent);margin-right:8px"></i>Settings</h2>
+            <button class="btn-icon-only" onclick="hideModal('settingsModal')"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+
+        <div style="margin-bottom:18px">
+            <label style="display:block;font-size:14px;font-weight:500;margin-bottom:6px;color:var(--text2)">Your Email (auto-filled in meetings)</label>
+            <input type="email" id="setEmail" class="input-field" placeholder="you@example.com">
+        </div>
+        <div style="margin-bottom:18px">
+            <label style="display:block;font-size:14px;font-weight:500;margin-bottom:6px;color:var(--text2)">Google Apps Script URL</label>
+            <input type="url" id="setUrl" class="input-field" style="font-family:'JetBrains Mono',monospace;font-size:12px" placeholder="https://script.google.com/macros/s/AKfycbxlWA7nkn3SSLkEukkSlai5Qnh1NnQ4B-gfI9zkQWVsClHYihCvziV1GvEZTFYIkWIF/exec">
+            <div style="display:flex;align-items:center;gap:6px;margin-top:6px">
+                <span class="dot" id="setDot"></span>
+                <span style="font-size:12px;color:var(--text3)" id="setStatus">Not configured</span>
+            </div>
+        </div>
+
+        <div style="display:flex;gap:10px">
+            <button class="btn btn-green btn-sm" onclick="doSaveSettings()"><i class="fa-solid fa-check"></i> Save</button>
+            <button class="btn btn-ghost btn-sm" onclick="hideModal('settingsModal');showModal('setupModal')"><i class="fa-solid fa-wand-magic-sparkles"></i> Setup Guide</button>
+        </div>
+    </div>
+</div>
+
+<!-- ===== MAIN PAGE ===== -->
+<div class="container">
+
+    <!-- Header -->
+    <header style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px" class="anim-in">
+        <div>
+            <h1 style="font-size:28px;font-weight:700;margin:0"><span style="color:var(--accent)">Voice</span> Meeting Scheduler</h1>
+            <p style="font-size:13px;color:var(--text3);margin-top:2px">Speak to schedule &mdash; auto contact lookup, calendar &amp; email</p>
+        </div>
+        <div style="display:flex;gap:8px">
+            <button class="btn-icon-only" onclick="showModal('settingsModal')" title="Settings"><i class="fa-solid fa-gear"></i></button>
+            <button class="btn-icon-only" onclick="showModal('setupModal')" title="Setup Guide" style="border-color:var(--warn);color:var(--warn)"><i class="fa-solid fa-circle-question"></i></button>
+        </div>
+    </header>
+
+    <!-- Setup Banner -->
+    <div id="setupBanner" class="setup-bar" style="margin-bottom:20px" onclick="showModal('setupModal')">
+        <i class="fa-solid fa-triangle-exclamation" style="color:var(--warn);font-size:16px"></i>
+        <div style="flex:1">
+            <div style="font-size:14px;font-weight:600;color:var(--warn)">Google Apps Script not configured</div>
+            <div style="font-size:12px;color:var(--text3)">Click to set up auto-sync to Sheets, Calendar &amp; Email</div>
+        </div>
+        <i class="fa-solid fa-arrow-right" style="color:var(--warn)"></i>
+    </div>
+
+    <!-- Voice Input Card -->
+    <div class="card anim-in" style="animation-delay:0.1s">
+        <div class="mic-wrap">
+            <button class="mic-circle" id="micBtn" onclick="toggleMic()" aria-label="Microphone">
+                <i class="fa-solid fa-microphone" style="font-size:28px;color:#fff" id="micIco"></i>
+            </button>
+            <div class="wave-row" id="waveRow" style="margin:12px auto">
+                <div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div>
+                <div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div>
+                <div class="wave-bar"></div><div class="wave-bar"></div><div class="wave-bar"></div>
+            </div>
+            <p style="font-size:13px;color:var(--text3)" id="micLabel">Click the microphone to start</p>
+
+            <div style="max-width:540px;margin:16px auto 0;text-align:left">
+                <div style="display:flex;gap:8px;margin-bottom:8px">
+                    <select id="langSel" class="input-field" style="max-width:160px">
+                        <option value="en-US">English (US)</option>
+                        <option value="en-GB">English (UK)</option>
+                        <option value="es-ES">Spanish</option>
+                        <option value="fr-FR">French</option>
+                        <option value="de-DE">German</option>
+                        <option value="hi-IN">Hindi</option>
+                        <option value="ja-JP">Japanese</option>
+                        <option value="zh-CN">Chinese</option>
+                    </select>
+                    <div style="flex:1"></div>
+                    <button class="btn btn-ghost btn-sm" onclick="doClearText()"><i class="fa-solid fa-eraser"></i> Clear</button>
+                </div>
+                <textarea id="speechText" class="input-field" rows="3" placeholder='Try: "tomorrow meeting with naresh chavan at 12 pm"'></textarea>
+                <div style="display:flex;gap:10px;margin-top:12px;justify-content:center">
+                    <button class="btn btn-green" onclick="doParse()"><i class="fa-solid fa-wand-magic-sparkles"></i> Schedule Meeting</button>
+                    <button class="btn btn-ghost" onclick="doReset()"><i class="fa-solid fa-rotate-left"></i> Reset</button>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- ========== MAIN ========== -->
-    <div class="relative z-10 max-w-5xl mx-auto px-4 py-6 sm:px-6 lg:px-8">
-
-        <!-- Header -->
-        <header class="flex items-center justify-between mb-6 fu">
-            <div>
-                <h1 class="text-2xl sm:text-3xl font-bold tracking-tight"><span style="color:var(--accent)">Voice</span> Meeting Scheduler</h1>
-                <p class="text-sm mt-1" style="color:var(--muted)">Speak to schedule — contacts auto-looked up, calendar &amp; email handled for you</p>
-            </div>
-            <div class="flex items-center gap-2">
-                <button class="bi" onclick="openModal('modal-settings')" title="Settings"><i class="fa-solid fa-gear"></i></button>
-                <button class="bi" onclick="openModal('modal-setup')" title="Setup Guide" style="border-color:var(--secondary);color:var(--secondary)"><i class="fa-solid fa-circle-question"></i></button>
-            </div>
-        </header>
-
-        <!-- Setup Banner -->
-        <div id="setup-banner" class="setup-banner mb-6 fu d1" onclick="openModal('modal-setup')">
-            <i class="fa-solid fa-triangle-exclamation text-lg" style="color:var(--secondary)"></i>
-            <div class="flex-1">
-                <p class="text-sm font-semibold" style="color:var(--secondary)">Google Apps Script not configured</p>
-                <p class="text-xs" style="color:var(--muted)">Click here to set up auto-sync to Google Sheets, Calendar &amp; Email</p>
-            </div>
-            <i class="fa-solid fa-arrow-right" style="color:var(--secondary)"></i>
+    <!-- Preview Card (hidden) -->
+    <div class="card" id="previewCard" style="display:none">
+        <h2 style="font-size:18px;font-weight:700;margin-bottom:16px;display:flex;align-items:center;gap:8px">
+            <i class="fa-solid fa-eye" style="color:var(--accent)"></i> Meeting Preview
+        </h2>
+        <div id="previewBody" style="margin-bottom:16px"></div>
+        <div style="display:flex;gap:10px;align-items:center">
+            <button class="btn btn-green" id="confirmBtn" onclick="doConfirm()"><i class="fa-solid fa-check"></i> Confirm &amp; Schedule</button>
+            <button class="btn btn-ghost" onclick="doEdit()"><i class="fa-solid fa-pen"></i> Edit</button>
         </div>
-
-        <!-- Voice Input -->
-        <section class="gc p-6 sm:p-8 mb-6 fu d1">
-            <div class="flex flex-col items-center text-center">
-                <button id="mic-btn" class="mic-btn mb-4" onclick="toggleMic()" aria-label="Toggle microphone">
-                    <i class="fa-solid fa-microphone text-3xl text-white" id="mic-icon"></i>
-                </button>
-                <div class="wf mb-3" id="waveform">
-                    <div class="wb"></div><div class="wb"></div><div class="wb"></div><div class="wb"></div><div class="wb"></div><div class="wb"></div><div class="wb"></div><div class="wb"></div><div class="wb"></div>
-                </div>
-                <p class="text-sm mb-4" id="mic-status" style="color:var(--muted)">Click the microphone to start</p>
-                <div class="w-full max-w-xl">
-                    <div class="flex gap-3 mb-3">
-                        <select id="lang-sel" class="fi" style="max-width:170px">
-                            <option value="en-US">English (US)</option>
-                            <option value="en-GB">English (UK)</option>
-                            <option value="es-ES">Spanish</option>
-                            <option value="fr-FR">French</option>
-                            <option value="de-DE">German</option>
-                            <option value="hi-IN">Hindi</option>
-                            <option value="ja-JP">Japanese</option>
-                            <option value="zh-CN">Chinese</option>
-                        </select>
-                        <div class="flex-1"></div>
-                        <button class="bs text-xs px-4" onclick="clearTranscript()"><i class="fa-solid fa-eraser mr-1"></i> Clear</button>
-                    </div>
-                    <textarea id="transcript" class="fi" rows="3" placeholder='Try: "tomorrow meeting with naresh chavan at 12 pm"'></textarea>
-                    <div class="flex gap-3 mt-3 justify-center">
-                        <button class="bp" onclick="parseAndPreview()"><i class="fa-solid fa-wand-magic-sparkles mr-2"></i> Schedule Meeting</button>
-                        <button class="bs" onclick="clearAll()"><i class="fa-solid fa-rotate-left mr-1"></i> Reset</button>
-                    </div>
-                </div>
-            </div>
-        </section>
-
-        <!-- Meeting Preview (hidden until parsed) -->
-        <section id="preview-section" class="gc p-6 sm:p-8 mb-6 fu d2" style="display:none">
-            <h2 class="text-lg font-bold mb-4 flex items-center gap-2"><i class="fa-solid fa-eye" style="color:var(--accent)"></i> Meeting Preview</h2>
-            <div id="preview-content" class="mb-5"></div>
-            <div class="flex items-center gap-4">
-                <button class="bp" id="confirm-btn" onclick="confirmSchedule()"><i class="fa-solid fa-check mr-2"></i> Confirm &amp; Schedule</button>
-                <button class="bs" onclick="hidePreview()"><i class="fa-solid fa-pen mr-1"></i> Edit Voice Input</button>
-            </div>
-        </section>
-
-        <!-- Contacts & Meetings Grid -->
-        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-12">
-
-            <!-- Contacts Section -->
-            <section class="gc p-5 fu d3">
-                <h2 class="text-sm font-bold mb-4 flex items-center gap-2 uppercase tracking-wider" style="color:var(--muted)">
-                    <i class="fa-solid fa-address-book" style="color:var(--secondary)"></i> Contacts
-                </h2>
-                <!-- Add Contact Form -->
-                <div class="flex gap-2 mb-4">
-                    <input id="c-name" class="fi" style="flex:1" placeholder="Name (e.g. Naresh Chavan)">
-                    <input id="c-email" class="fi" style="flex:1.2" placeholder="Email (e.g. naresh@co.com)">
-                    <button class="bp text-sm px-4 whitespace-nowrap" onclick="addContact()"><i class="fa-solid fa-plus mr-1"></i> Add</button>
-                </div>
-                <div id="contacts-list" class="space-y-2 max-h-72 overflow-y-auto"></div>
-            </section>
-
-            <!-- Recent Meetings -->
-            <section class="gc p-5 fu d4">
-                <h2 class="text-sm font-bold mb-4 flex items-center gap-2 uppercase tracking-wider" style="color:var(--muted)">
-                    <i class="fa-solid fa-clock-rotate-left" style="color:var(--accent)"></i> Recent Meetings
-                </h2>
-                <div id="meetings-list" class="space-y-2 max-h-72 overflow-y-auto"></div>
-            </section>
-        </div>
-
-        <!-- Result (hidden until meeting scheduled) -->
-        <section id="result-section" class="gc p-6 mb-12 fu" style="display:none">
-            <div id="result-content"></div>
-        </section>
-
-        <footer class="text-center text-xs pb-6" style="color:var(--border)">Voice Meeting Scheduler &mdash; Web Speech API &amp; Google Apps Script</footer>
     </div>
+
+    <!-- Result Card (hidden) -->
+    <div class="card" id="resultCard" style="display:none"></div>
+
+    <!-- Contacts + Meetings -->
+    <div class="grid-2">
+
+        <!-- Contacts -->
+        <div class="card anim-in" style="animation-delay:0.2s">
+            <h2 style="font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--text3);margin-bottom:14px;display:flex;align-items:center;gap:6px">
+                <i class="fa-solid fa-address-book" style="color:var(--warn)"></i> Contacts
+            </h2>
+            <div style="display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap">
+                <input id="ctName" class="input-field" style="flex:1;min-width:120px" placeholder="Name">
+                <input id="ctEmail" class="input-field" style="flex:1.2;min-width:150px" placeholder="Email">
+                <button class="btn btn-green btn-sm" onclick="doAddContact()" style="white-space:nowrap"><i class="fa-solid fa-plus"></i> Add</button>
+            </div>
+            <div id="ctList" style="max-height:260px;overflow-y:auto;display:flex;flex-direction:column;gap:6px"></div>
+        </div>
+
+        <!-- Recent Meetings -->
+        <div class="card anim-in" style="animation-delay:0.3s">
+            <h2 style="font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--text3);margin-bottom:14px;display:flex;align-items:center;gap:6px">
+                <i class="fa-solid fa-clock-rotate-left" style="color:var(--accent)"></i> Recent Meetings
+            </h2>
+            <div id="mtList" style="max-height:260px;overflow-y:auto;display:flex;flex-direction:column;gap:6px"></div>
+        </div>
+    </div>
+
+    <footer style="text-align:center;padding:24px 0 12px;font-size:11px;color:var(--border)">
+        Voice Meeting Scheduler
+    </footer>
+</div>
 
 <script>
-/* ============================================================
-   STATE
-============================================================ */
-var APP_KEY = 'vms_';
-var isListening = false;
-var recognition = null;
-var finalTranscript = '';
-var currentPreview = null; // holds parsed meeting data before confirm
+/* ===== APP STATE ===== */
+var AK = 'vms_';
+var listening = false;
+var recog = null;
+var savedText = '';
+var preview = null;
 
-/* ============================================================
-   UTILITY
-============================================================ */
-function lsG(k){try{return JSON.parse(localStorage.getItem(APP_KEY+k))}catch(e){return null}}
-function lsS(k,v){localStorage.setItem(APP_KEY+k,JSON.stringify(v))}
-function openModal(id){document.getElementById(id).classList.add('open');document.body.style.overflow='hidden'}
-function closeModal(id){document.getElementById(id).classList.remove('open');document.body.style.overflow=''}
-function showToast(msg,type){type=type||'ok';var box=document.getElementById('toast-box');var t=document.createElement('div');var ic=type==='ok'?'fa-circle-check':type==='err'?'fa-circle-exclamation':'fa-triangle-exclamation';t.className='toast toast-'+type;t.innerHTML='<i class="fa-solid '+ic+' mr-2"></i>'+msg;box.appendChild(t);requestAnimationFrame(function(){t.classList.add('show')});setTimeout(function(){t.classList.remove('show');setTimeout(function(){t.remove()},400)},4000)}
-function fmtDate(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')}
-function capitalize(s){return s.replace(/\b\w/g,function(c){return c.toUpperCase()})}
+/* Google Apps Script code */
+var GAS_CODE = 'const SHEET_NAME = "Meetings";\nconst CONTACTS_SHEET = "Contacts";\n\nfunction doPost(e) {\n  try {\n    var data = JSON.parse(e.postData.contents);\n    var action = data.action || "schedule";\n    if (action === "schedule") return scheduleMeeting(data);\n    if (action === "addContact") return addContactToSheet(data);\n    if (action === "deleteContact") return deleteContactFromSheet(data);\n    if (action === "syncContacts") return syncContactsToSheet(data);\n    return ContentService.createTextOutput(JSON.stringify({status:"error",message:"Unknown action"})).setMimeType(ContentService.MimeType.JSON);\n  } catch (error) {\n    return ContentService.createTextOutput(JSON.stringify({status:"error",message:error.toString()})).setMimeType(ContentService.MimeType.JSON);\n  }\n}\n\nfunction scheduleMeeting(data) {\n  var ss = SpreadsheetApp.getActiveSpreadsheet();\n  var sheet = ss.getSheetByName(SHEET_NAME);\n  if (!sheet) {\n    sheet = ss.insertSheet(SHEET_NAME);\n    sheet.appendRow(["Timestamp","Title","Date","Time","Duration","Your Email","Guest Name","Guest Email","Description","Status"]);\n    sheet.getRange(1,1,1,10).setFontWeight("bold");\n  }\n  sheet.appendRow([new Date().toISOString(), data.title, data.date, data.time, data.duration, data.yourEmail, data.guestName||"", data.guestEmail, data.description||"", "Scheduled"]);\n\n  var startTime = new Date(data.date + "T" + data.time + ":00");\n  var endTime = new Date(startTime.getTime() + parseInt(data.duration)*60000);\n\n  var event = CalendarApp.getDefaultCalendar().createEvent(data.title, startTime, endTime, {\n    description: (data.description||"") + "\\n\\nScheduled via Voice Meeting Scheduler",\n    guests: data.guestEmail,\n    sendInvites: true\n  });\n\n  var details = "Meeting: " + data.title + "\\nDate: " + data.date + "\\nTime: " + data.time + "\\nDuration: " + data.duration + " minutes\\nGuest: " + (data.guestName||data.guestEmail) + "\\nDescription: " + (data.description||"") + "\\n\\nCalendar event created.";\n\n  MailApp.sendEmail({to: data.yourEmail, subject: "Meeting Scheduled: " + data.title, body: details});\n  MailApp.sendEmail({to: data.guestEmail, subject: "Meeting Invitation: " + data.title, body: "You have been invited to a meeting by " + data.yourEmail + ":\\n\\n" + details});\n\n  return ContentService.createTextOutput(JSON.stringify({status:"success",eventId:event.getId()})).setMimeType(ContentService.MimeType.JSON);\n}\n\nfunction addContactToSheet(data) {\n  var ss = SpreadsheetApp.getActiveSpreadsheet();\n  var sheet = ss.getSheetByName(CONTACTS_SHEET);\n  if (!sheet) {\n    sheet = ss.insertSheet(CONTACTS_SHEET);\n    sheet.appendRow(["Name","Email"]);\n    sheet.getRange(1,1,1,2).setFontWeight("bold");\n  }\n  var values = sheet.getDataRange().getValues();\n  for (var i = 1; i < values.length; i++) {\n    if (values[i][1] === data.email) {\n      sheet.getRange(i+1,1).setValue(data.name);\n      return ContentService.createTextOutput(JSON.stringify({status:"success",message:"Updated"})).setMimeType(ContentService.MimeType.JSON);\n    }\n  }\n  sheet.appendRow([data.name, data.email]);\n  return ContentService.createTextOutput(JSON.stringify({status:"success",message:"Added"})).setMimeType(ContentService.MimeType.JSON);\n}\n\nfunction deleteContactFromSheet(data) {\n  var ss = SpreadsheetApp.getActiveSpreadsheet();\n  var sheet = ss.getSheetByName(CONTACTS_SHEET);\n  if (!sheet) return ContentService.createTextOutput(JSON.stringify({status:"error"})).setMimeType(ContentService.MimeType.JSON);\n  var values = sheet.getDataRange().getValues();\n  for (var i = values.length-1; i >= 1; i--) {\n    if (values[i][1] === data.email) sheet.deleteRow(i+1);\n  }\n  return ContentService.createTextOutput(JSON.stringify({status:"success"})).setMimeType(ContentService.MimeType.JSON);\n}\n\nfunction syncContactsToSheet(data) {\n  var ss = SpreadsheetApp.getActiveSpreadsheet();\n  var sheet = ss.getSheetByName(CONTACTS_SHEET);\n  if (!sheet) {\n    sheet = ss.insertSheet(CONTACTS_SHEET);\n    sheet.appendRow(["Name","Email"]);\n    sheet.getRange(1,1,1,2).setFontWeight("bold");\n  }\n  var lastRow = sheet.getLastRow();\n  if (lastRow > 1) sheet.deleteRows(2, lastRow-1);\n  var contacts = data.contacts || [];\n  for (var i = 0; i < contacts.length; i++) {\n    sheet.appendRow([contacts[i].name, contacts[i].email]);\n  }\n  return ContentService.createTextOutput(JSON.stringify({status:"success"})).setMimeType(ContentService.MimeType.JSON);\n}\n\nfunction doGet(e) {\n  var ss = SpreadsheetApp.getActiveSpreadsheet();\n  var result = {contacts:[], meetings:[]};\n  var cs = ss.getSheetByName(CONTACTS_SHEET);\n  if (cs) {\n    var cd = cs.getDataRange().getValues();\n    for (var i=1;i<cd.length;i++) { if(cd[i][0]&&cd[i][1]) result.contacts.push({name:cd[i][0],email:cd[i][1]}); }\n  }\n  var ms = ss.getSheetByName(SHEET_NAME);\n  if (ms) {\n    var md = ms.getDataRange().getValues();\n    var h = md[0];\n    for (var i=1;i<md.length;i++) { var o={}; for(var j=0;j<h.length;j++) o[h[j]]=md[i][j]; result.meetings.push(o); }\n  }\n  return ContentService.createTextOutput(JSON.stringify(result)).setMimeType(ContentService.MimeType.JSON);\n}';
 
-/* ============================================================
-   SETTINGS
-============================================================ */
-function loadSettings(){
-    var email=lsG('email')||'';var url=lsG('scriptUrl')||'';
-    document.getElementById('cfg-email').value=email;
-    document.getElementById('cfg-url').value=url;
-    updateStatus();updateBanner();
-}
-function saveSettings(){
-    var email=document.getElementById('cfg-email').value.trim();
-    var url=document.getElementById('cfg-url').value.trim();
-    lsS('email',email);lsS('scriptUrl',url);
-    updateStatus();updateBanner();
-    showToast('Settings saved!','ok');closeModal('modal-settings');
-}
-function updateStatus(){
-    var url=lsG('scriptUrl');var dot=document.getElementById('cfg-status');var txt=document.getElementById('cfg-status-text');
-    if(url){dot.className='sdot sdot-on';txt.textContent='Apps Script configured';txt.style.color='var(--accent)'}
-    else{dot.className='sdot sdot-off';txt.textContent='Not configured';txt.style.color='var(--muted)'}
-}
-function updateBanner(){
-    document.getElementById('setup-banner').style.display=lsG('scriptUrl')?'none':'flex';
-}
-function copyScript(){
-    var code=document.getElementById('script-code').textContent;
-    navigator.clipboard.writeText(code).then(function(){showToast('Copied to clipboard!','ok');var ic=document.getElementById('copy-icon');ic.className='fa-solid fa-check';setTimeout(function(){ic.className='fa-solid fa-copy'},2000)}).catch(function(){var ta=document.createElement('textarea');ta.value=code;document.body.appendChild(ta);ta.select();document.execCommand('copy');document.body.removeChild(ta);showToast('Copied!','ok')});
+/* ===== UTILITIES ===== */
+function lg(k) { try { return JSON.parse(localStorage.getItem(AK + k)); } catch(e) { return null; } }
+function ls(k, v) { localStorage.setItem(AK + k, JSON.stringify(v)); }
+
+function showModal(id) { document.getElementById(id).classList.add('visible'); }
+function hideModal(id) { document.getElementById(id).classList.remove('visible'); }
+
+function toast(msg, type) {
+    type = type || 'ok';
+    var area = document.getElementById('toastArea');
+    var el = document.createElement('div');
+    el.className = 'toast-msg t-' + type;
+    var ico = type === 'ok' ? 'fa-circle-check' : type === 'err' ? 'fa-circle-exclamation' : 'fa-triangle-exclamation';
+    el.innerHTML = '<i class="fa-solid ' + ico + '" style="margin-right:6px"></i>' + msg;
+    area.appendChild(el);
+    setTimeout(function() { el.style.opacity = '0'; el.style.transition = 'opacity 0.3s'; setTimeout(function() { el.remove(); }, 300); }, 3500);
 }
 
-/* ============================================================
-   CONTACTS — local storage + Google Sheet sync
-============================================================ */
-function getContacts(){return lsG('contacts')||[]}
-function setContacts(arr){lsS('contacts',arr);renderContacts()}
+function fmtD(d) {
+    return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+}
 
-function addContact(){
-    var name=document.getElementById('c-name').value.trim();
-    var email=document.getElementById('c-email').value.trim();
-    if(!name||!email){showToast('Please enter both name and email','err');return}
-    if(!/\S+@\S+\.\S+/.test(email)){showToast('Invalid email format','err');return}
-    var contacts=getContacts();
-    // Check duplicate email
-    for(var i=0;i<contacts.length;i++){
-        if(contacts[i].email.toLowerCase()===email.toLowerCase()){
-            contacts[i].name=name;setContacts(contacts);
-            document.getElementById('c-name').value='';document.getElementById('c-email').value='';
-            showToast('Contact updated: '+name,'ok');
-            syncContactToSheet(name,email);return;
+function capWords(s) { return s.replace(/\b\w/g, function(c) { return c.toUpperCase(); }); }
+
+/* ===== SETTINGS ===== */
+function loadSettings() {
+    var email = lg('email') || '';
+    var url = lg('scriptUrl') || '';
+    document.getElementById('setEmail').value = email;
+    document.getElementById('setUrl').value = url;
+    refreshSettingsUI();
+    refreshBanner();
+}
+
+function doSaveSettings() {
+    ls('email', document.getElementById('setEmail').value.trim());
+    ls('scriptUrl', document.getElementById('setUrl').value.trim());
+    refreshSettingsUI();
+    refreshBanner();
+    toast('Settings saved!');
+    hideModal('settingsModal');
+}
+
+function refreshSettingsUI() {
+    var url = lg('scriptUrl');
+    var dot = document.getElementById('setDot');
+    var txt = document.getElementById('setStatus');
+    if (url) {
+        dot.className = 'dot dot-green';
+        txt.textContent = 'Apps Script configured';
+        txt.style.color = 'var(--accent)';
+    } else {
+        dot.className = 'dot dot-red';
+        txt.textContent = 'Not configured';
+        txt.style.color = 'var(--text3)';
+    }
+}
+
+function refreshBanner() {
+    document.getElementById('setupBanner').style.display = lg('scriptUrl') ? 'none' : 'flex';
+}
+
+function copyCode() {
+    navigator.clipboard.writeText(GAS_CODE).then(function() {
+        toast('Copied to clipboard!');
+        var b = document.getElementById('copyBtn');
+        b.className = 'fa-solid fa-check';
+        setTimeout(function() { b.className = 'fa-solid fa-copy'; }, 1500);
+    }).catch(function() {
+        var ta = document.createElement('textarea');
+        ta.value = GAS_CODE;
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+        toast('Copied!');
+    });
+}
+
+/* ===== CONTACTS ===== */
+function getCt() { return lg('contacts') || []; }
+function setCt(arr) { ls('contacts', arr); drawCt(); }
+
+function doAddContact() {
+    var n = document.getElementById('ctName').value.trim();
+    var e = document.getElementById('ctEmail').value.trim();
+    if (!n || !e) { toast('Enter both name and email', 'err'); return; }
+    if (e.indexOf('@') < 1) { toast('Invalid email', 'err'); return; }
+    var list = getCt();
+    for (var i = 0; i < list.length; i++) {
+        if (list[i].email.toLowerCase() === e.toLowerCase()) {
+            list[i].name = n;
+            setCt(list);
+            document.getElementById('ctName').value = '';
+            document.getElementById('ctEmail').value = '';
+            toast('Contact updated: ' + n);
+            pushCtToSheet(n, e);
+            return;
         }
     }
-    contacts.push({name:name,email:email});setContacts(contacts);
-    document.getElementById('c-name').value='';document.getElementById('c-email').value='';
-    showToast('Contact added: '+name,'ok');
-    syncContactToSheet(name,email);
+    list.push({ name: n, email: e });
+    setCt(list);
+    document.getElementById('ctName').value = '';
+    document.getElementById('ctEmail').value = '';
+    toast('Contact added: ' + n);
+    pushCtToSheet(n, e);
 }
 
-function removeContact(idx){
-    var contacts=getContacts();var removed=contacts.splice(idx,1)[0];
-    setContacts(contacts);
-    showToast('Contact removed: '+removed.name,'ok');
-    // Delete from sheet
-    if(lsG('scriptUrl')&&removed.email){
-        fetch(lsG('scriptUrl'),{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'deleteContact',email:removed.email})}).catch(function(){});
+function doRemoveCt(idx) {
+    var list = getCt();
+    var removed = list.splice(idx, 1)[0];
+    setCt(list);
+    toast('Removed: ' + removed.name);
+    var url = lg('scriptUrl');
+    if (url && removed.email) {
+        fetch(url, { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify({ action: 'deleteContact', email: removed.email }) }).catch(function() {});
     }
 }
 
-function syncContactToSheet(name,email){
-    var url=lsG('scriptUrl');
-    if(!url)return;
-    fetch(url,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'addContact',name:name,email:email})}).catch(function(){});
+function pushCtToSheet(name, email) {
+    var url = lg('scriptUrl');
+    if (!url) return;
+    fetch(url, { method: 'POST', mode: 'no-cors', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify({ action: 'addContact', name: name, email: email }) }).catch(function() {});
 }
 
-function syncAllContactsToSheet(){
-    var url=lsG('scriptUrl');if(!url)return;
-    fetch(url,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain'},body:JSON.stringify({action:'syncContacts',contacts:getContacts()})}).catch(function(){});
-}
-
-// Fetch contacts from Google Sheet and merge with local
-function fetchSheetContacts(){
-    var url=lsG('scriptUrl');if(!url)return;
-    fetch(url,{method:'GET'}).then(function(r){return r.json()}).then(function(data){
-        if(data.contacts&&data.contacts.length){
-            var local=getContacts();
-            var merged=local.slice();
-            data.contacts.forEach(function(sc){
-                var found=false;
-                for(var i=0;i<merged.length;i++){
-                    if(merged[i].email.toLowerCase()===sc.email.toLowerCase()){found=true;break}
+function pullCtFromSheet() {
+    var url = lg('scriptUrl');
+    if (!url) return;
+    fetch(url, { method: 'GET' }).then(function(r) { return r.json(); }).then(function(data) {
+        if (data.contacts && data.contacts.length) {
+            var local = getCt();
+            var merged = local.slice();
+            for (var si = 0; si < data.contacts.length; si++) {
+                var sc = data.contacts[si];
+                var found = false;
+                for (var li = 0; li < merged.length; li++) {
+                    if (merged[li].email.toLowerCase() === sc.email.toLowerCase()) { found = true; break; }
                 }
-                if(!found)merged.push({name:sc.name,email:sc.email});
-            });
-            setContacts(merged);
+                if (!found) merged.push({ name: sc.name, email: sc.email });
+            }
+            setCt(merged);
         }
-        if(data.meetings){renderSheetMeetings(data.meetings)}
-    }).catch(function(){});
+    }).catch(function() {});
 }
 
-function lookupContact(name){
-    var contacts=getContacts();
-    var search=name.toLowerCase().trim();
-    // Exact match
-    for(var i=0;i<contacts.length;i++){
-        if(contacts[i].name.toLowerCase()===search)return contacts[i];
-    }
-    // Name contains search
-    for(var i=0;i<contacts.length;i++){
-        if(contacts[i].name.toLowerCase().includes(search))return contacts[i];
-    }
-    // Search contains name
-    for(var i=0;i<contacts.length;i++){
-        if(search.includes(contacts[i].name.toLowerCase()))return contacts[i];
-    }
-    // First word match
-    var first=search.split(/\s+/)[0];
-    for(var i=0;i<contacts.length;i++){
-        if(contacts[i].name.toLowerCase().startsWith(first))return contacts[i];
-    }
+function findContact(name) {
+    var list = getCt();
+    var s = name.toLowerCase().trim();
+    for (var i = 0; i < list.length; i++) { if (list[i].name.toLowerCase() === s) return list[i]; }
+    for (var i = 0; i < list.length; i++) { if (list[i].name.toLowerCase().indexOf(s) >= 0) return list[i]; }
+    for (var i = 0; i < list.length; i++) { if (s.indexOf(list[i].name.toLowerCase()) >= 0) return list[i]; }
+    var first = s.split(/\s+/)[0];
+    for (var i = 0; i < list.length; i++) { if (list[i].name.toLowerCase().indexOf(first) === 0) return list[i]; }
     return null;
 }
 
-function renderContacts(){
-    var box=document.getElementById('contacts-list');
-    var contacts=getContacts();
-    if(!contacts.length){box.innerHTML='<p class="text-xs" style="color:var(--muted)">No contacts yet. Add your first contact above.</p>';return}
-    var colors=['#10b981','#f59e0b','#ef4444','#8b5cf6','#06b6d4','#ec4899','#f97316','#14b8a6'];
-    var html='';
-    for(var i=0;i<contacts.length;i++){
-        var c=contacts[i];var color=colors[i%colors.length];
-        var initials=c.name.split(/\s+/).map(function(w){return w[0]}).join('').substring(0,2).toUpperCase();
-        html+='<div class="contact-item">'+
-            '<div class="contact-avatar" style="background:'+color+'22;color:'+color+';border:1px solid '+color+'44">'+initials+'</div>'+
-            '<div class="flex-1 min-w-0"><p class="font-medium text-sm truncate">'+c.name+'</p><p class="text-xs truncate" style="color:var(--muted)">'+c.email+'</p></div>'+
-            '<button class="bi danger" onclick="removeContact('+i+')" title="Remove"><i class="fa-solid fa-trash-can"></i></button>'+
-        '</div>';
+function drawCt() {
+    var box = document.getElementById('ctList');
+    var list = getCt();
+    if (!list.length) {
+        box.innerHTML = '<p style="font-size:12px;color:var(--text3)">No contacts yet. Add your first contact above.</p>';
+        return;
     }
-    box.innerHTML=html;
+    var colors = ['#00d68f','#ffb020','#ff4757','#8b5cf6','#06b6d4','#ec4899','#f97316','#14b8a6'];
+    var h = '';
+    for (var i = 0; i < list.length; i++) {
+        var c = list[i];
+        var cl = colors[i % colors.length];
+        var ini = c.name.split(/\s+/).map(function(w) { return w[0]; }).join('').substring(0,2).toUpperCase();
+        h += '<div class="ct-item">' +
+            '<div class="ct-avatar" style="background:' + cl + '18;color:' + cl + ';border:1px solid ' + cl + '40">' + ini + '</div>' +
+            '<div style="flex:1;min-width:0;overflow:hidden"><div style="font-size:14px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + c.name + '</div><div style="font-size:12px;color:var(--text3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + c.email + '</div></div>' +
+            '<button class="btn-icon-only red" onclick="doRemoveCt(' + i + ')" title="Remove"><i class="fa-solid fa-trash-can"></i></button>' +
+            '</div>';
+    }
+    box.innerHTML = h;
 }
 
-/* ============================================================
-   VOICE RECOGNITION
-============================================================ */
-function initSpeech(){
-    var SR=window.SpeechRecognition||window.webkitSpeechRecognition;
-    if(!SR){document.getElementById('mic-status').textContent='Speech recognition not supported — type manually';document.getElementById('mic-btn').style.opacity='.4';document.getElementById('mic-btn').style.cursor='not-allowed';return}
-    recognition=new SR();recognition.continuous=true;recognition.interimResults=true;recognition.lang=document.getElementById('lang-sel').value;
-    recognition.onresult=function(e){var interim='';for(var i=e.resultIndex;i<e.results.length;i++){if(e.results[i].isFinal)finalTranscript+=e.results[i][0].transcript+' ';else interim+=e.results[i][0].transcript}document.getElementById('transcript').value=finalTranscript+interim};
-    recognition.onerror=function(e){if(e.error==='no-speech')return;showToast('Speech error: '+e.error,'err');stopListening()};
-    recognition.onend=function(){if(isListening)try{recognition.start()}catch(e){stopListening()}};
+/* ===== SPEECH ===== */
+function initSpeech() {
+    var SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SR) {
+        document.getElementById('micLabel').textContent = 'Speech not supported - type manually';
+        document.getElementById('micBtn').style.opacity = '0.4';
+        document.getElementById('micBtn').style.cursor = 'not-allowed';
+        return;
+    }
+    recog = new SR();
+    recog.continuous = true;
+    recog.interimResults = true;
+    recog.lang = document.getElementById('langSel').value;
+    recog.onresult = function(ev) {
+        var interim = '';
+        for (var i = ev.resultIndex; i < ev.results.length; i++) {
+            if (ev.results[i].isFinal) savedText += ev.results[i][0].transcript + ' ';
+            else interim += ev.results[i][0].transcript;
+        }
+        document.getElementById('speechText').value = savedText + interim;
+    };
+    recog.onerror = function(ev) {
+        if (ev.error === 'no-speech') return;
+        toast('Speech error: ' + ev.error, 'err');
+        stopMic();
+    };
+    recog.onend = function() {
+        if (listening) { try { recog.start(); } catch(e) { stopMic(); } }
+    };
 }
-function toggleMic(){if(!recognition){showToast('Speech recognition not available','err');return}isListening?stopListening():startListening()}
-function startListening(){
-    isListening=true;finalTranscript=document.getElementById('transcript').value;
-    recognition.lang=document.getElementById('lang-sel').value;
-    try{recognition.start()}catch(e){}
-    document.getElementById('mic-btn').classList.add('active');document.getElementById('waveform').classList.add('on');
-    document.getElementById('mic-icon').className='fa-solid fa-stop text-3xl text-white';
-    document.getElementById('mic-status').textContent='Listening... speak now';document.getElementById('mic-status').style.color='var(--accent)';
+
+function toggleMic() {
+    if (!recog) { toast('Speech not available', 'err'); return; }
+    if (listening) stopMic(); else startMic();
 }
-function stopListening(){
-    isListening=false;if(recognition)try{recognition.stop()}catch(e){}
-    document.getElementById('mic-btn').classList.remove('active');document.getElementById('waveform').classList.remove('on');
-    document.getElementById('mic-icon').className='fa-solid fa-microphone text-3xl text-white';
-    document.getElementById('mic-status').textContent='Click the microphone to start';document.getElementById('mic-status').style.color='var(--muted)';
+
+function startMic() {
+    listening = true;
+    savedText = document.getElementById('speechText').value;
+    recog.lang = document.getElementById('langSel').value;
+    try { recog.start(); } catch(e) {}
+    document.getElementById('micBtn').classList.add('on');
+    document.getElementById('waveRow').classList.add('on');
+    document.getElementById('micIco').className = 'fa-solid fa-stop';
+    document.getElementById('micIco').style.fontSize = '28px';
+    document.getElementById('micIco').style.color = '#fff';
+    document.getElementById('micLabel').textContent = 'Listening... speak now';
+    document.getElementById('micLabel').style.color = 'var(--accent)';
 }
-function clearTranscript(){finalTranscript='';document.getElementById('transcript').value=''}
-function clearAll(){clearTranscript();hidePreview();document.getElementById('result-section').style.display='none'}
 
-/* ============================================================
-   NLP PARSING — Extract meeting details + guest name
-============================================================ */
-var MONTHS={jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11};
+function stopMic() {
+    listening = false;
+    if (recog) try { recog.stop(); } catch(e) {}
+    document.getElementById('micBtn').classList.remove('on');
+    document.getElementById('waveRow').classList.remove('on');
+    document.getElementById('micIco').className = 'fa-solid fa-microphone';
+    document.getElementById('micIco').style.fontSize = '28px';
+    document.getElementById('micIco').style.color = '#fff';
+    document.getElementById('micLabel').textContent = 'Click the microphone to start';
+    document.getElementById('micLabel').style.color = 'var(--text3)';
+}
 
-function nextWeekday(from,dayIdx){var d=new Date(from);var diff=(dayIdx-d.getDay()+7)%7||7;d.setDate(d.getDate()+diff);return fmtDate(d)}
+function doClearText() { savedText = ''; document.getElementById('speechText').value = ''; }
+function doReset() { doClearText(); document.getElementById('previewCard').style.display = 'none'; document.getElementById('resultCard').style.display = 'none'; preview = null; }
 
-function parseMeetingText(text){
-    var r={title:'',date:'',time:'',duration:30,guestName:'',guestEmail:'',description:text.trim()};
-    var t=text.trim();if(!t)return r;
+/* ===== NLP ===== */
+var MO = { jan:0,feb:1,mar:2,apr:3,may:4,jun:5,jul:6,aug:7,sep:8,oct:9,nov:10,dec:11 };
 
-    // Extract email if present
-    var em=t.match(/[\w.\-]+@[\w.\-]+\.\w+/);
-    if(em)r.guestEmail=em[0];
+function nextWD(from, di) {
+    var d = new Date(from);
+    var diff = (di - d.getDay() + 7) % 7 || 7;
+    d.setDate(d.getDate() + diff);
+    return fmtD(d);
+}
 
-    // Extract guest name from "with [NAME]" pattern
-    if(!r.guestEmail){
-        var nm=t.match(/\bwith\s+([^\.,]+?)(?:\s+(?:at|on|for|tomorrow|next|this|from|by|about|regarding)\b|[,\.]|$)/i);
-        if(nm&&nm[1].trim()){
-            r.guestName=capitalize(nm[1].trim());
+function parseText(text) {
+    var r = { title:'', date:'', time:'', duration:30, guestName:'', guestEmail:'', note: text.trim() };
+    var t = text.trim();
+    if (!t) return r;
+
+    var em = t.match(/[\w.\-]+@[\w.\-]+\.\w+/);
+    if (em) r.guestEmail = em[0];
+
+    if (!r.guestEmail) {
+        var nm = t.match(/\bwith\s+([^,.]+?)(?:\s+(?:at|on|for|tomorrow|next|this|from|by)\b|[,.]|$)/i);
+        if (nm && nm[1].trim()) r.guestName = capWords(nm[1].trim());
+    }
+
+    var tm = t.match(/\b(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b/i);
+    if (tm) {
+        var h = parseInt(tm[1]), m = tm[2] ? parseInt(tm[2]) : 0, ap = tm[3].toLowerCase();
+        if (ap === 'pm' && h !== 12) h += 12;
+        if (ap === 'am' && h === 12) h = 0;
+        r.time = String(h).padStart(2,'0') + ':' + String(m).padStart(2,'0');
+    }
+
+    var hd = t.match(/(\d+)\s*hours?\b/i);
+    var md = t.match(/(\d+)\s*(?:min(?:ute)?s?)\b/i);
+    if (hd) r.duration = parseInt(hd[1]) * 60;
+    else if (md) r.duration = parseInt(md[1]);
+
+    var now = new Date();
+    if (/\btoday\b/i.test(t)) r.date = fmtD(now);
+    else if (/\btomorrow\b/i.test(t)) { var d = new Date(now); d.setDate(d.getDate()+1); r.date = fmtD(d); }
+    else {
+        var days = ['sunday','monday','tuesday','wednesday','thursday','friday','saturday'];
+        var df = false;
+        for (var i = 0; i < days.length; i++) {
+            if (new RegExp('\\b(?:next\\s+)?' + days[i] + '\\b','i').test(t)) { r.date = nextWD(now,i); df = true; break; }
+        }
+        if (!df) {
+            var m1 = t.match(/\b(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+(\d{1,2})\b/i);
+            var m2 = t.match(/\b(\d{1,2})\s*(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\b/i);
+            var mn = -1, dn = 0;
+            if (m1) { mn = MO[m1[1].substring(0,3).toLowerCase()]; dn = parseInt(m1[2]); }
+            else if (m2) { mn = MO[m2[2].substring(0,3).toLowerCase()]; dn = parseInt(m2[1]); }
+            if (mn >= 0) r.date = now.getFullYear() + '-' + String(mn+1).padStart(2,'0') + '-' + String(dn).padStart(2,'0');
         }
     }
 
-    // Extract time
-    var tm=t.match(/\b(\d{1,2})(?::(\d{2}))?\s*(am|pm)\b/i);
-    if(tm){
-        var h=parseInt(tm[1]);var m=tm[2]?parseInt(tm[2]):0;var ap=tm[3].toLowerCase();
-        if(ap==='pm'&&h!==12)h+=12;if(ap==='am'&&h===12)h=0;
-        r.time=String(h).padStart(2,'0')+':'+String(m).padStart(2,'0');
-    }
-
-    // Extract duration
-    var hd=t.match(/(\d+)\s*hours?\b/i);var md=t.match(/(\d+)\s*(?:min(?:ute)?s?)\b/i);
-    if(hd)r.duration=parseInt(hd[1])*60;else if(md)r.duration=parseInt(md[1]);
-
-    // Extract date
-    var now=new Date();
-    if(/\btoday\b/i.test(t))r.date=fmtDate(now);
-    else if(/\btomorrow\b/i.test(t)){var d=new Date(now);d.setDate(d.getDate()+1);r.date=fmtDate(d)}
-    else{
-        var days=['sunday','monday','tuesday','wednesday','thursday','friday','saturday'];
-        var found=false;
-        for(var i=0;i<days.length;i++){var rx=new RegExp('\\b(?:next\\s+)?'+days[i]+'\\b','i');if(rx.test(t)){r.date=nextWeekday(now,i);found=true;break}}
-        if(!found){
-            var m1=t.match(/\b(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+(\d{1,2})\b/i);
-            var m2=t.match(/\b(\d{1,2})\s*(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\b/i);
-            var mn=-1,dn=0;
-            if(m1){mn=MONTHS[m1[1].substring(0,3).toLowerCase()];dn=parseInt(m1[2])}
-            else if(m2){mn=MONTHS[m2[2].substring(0,3).toLowerCase()];dn=parseInt(m2[1])}
-            if(mn>=0)r.date=now.getFullYear()+'-'+String(mn+1).padStart(2,'0')+'-'+String(dn).padStart(2,'0');
-        }
-    }
-
-    // Title
-    if(r.guestName)r.title='Meeting with '+r.guestName;
-    else if(r.guestEmail)r.title='Voice Meeting';
-    else if(/\bmeeting\b/i.test(t))r.title='Voice Meeting';
-    else if(/\bcall\b/i.test(t))r.title='Voice Call';
-    else r.title='Scheduled Meeting';
+    if (r.guestName) r.title = 'Meeting with ' + r.guestName;
+    else if (r.guestEmail) r.title = 'Voice Meeting';
+    else if (/\bmeeting\b/i.test(t)) r.title = 'Voice Meeting';
+    else r.title = 'Scheduled Meeting';
 
     return r;
 }
 
-/* ============================================================
-   PREVIEW — Show parsed meeting before confirming
-============================================================ */
-function parseAndPreview(){
-    var text=document.getElementById('transcript').value.trim();
-    if(!text){showToast('Please speak or type meeting details first','warn');return}
-    stopListening();
+/* ===== PREVIEW ===== */
+function doParse() {
+    var text = document.getElementById('speechText').value.trim();
+    if (!text) { toast('Type or speak meeting details first', 'warn'); return; }
+    stopMic();
 
-    var d=parseMeetingText(text);
-    var yourEmail=lsG('email')||'';
+    var d = parseText(text);
+    var yourEmail = lg('email') || '';
 
-    // Look up guest name in contacts
-    var contactFound=null;
-    if(d.guestName&&!d.guestEmail){
-        contactFound=lookupContact(d.guestName);
-        if(contactFound)d.guestEmail=contactFound.email;
+    var cFound = null;
+    if (d.guestName && !d.guestEmail) {
+        cFound = findContact(d.guestName);
+        if (cFound) d.guestEmail = cFound.email;
     }
-    if(d.guestEmail&&!d.guestName){
-        // Reverse lookup: find name from email
-        var contacts=getContacts();
-        for(var i=0;i<contacts.length;i++){
-            if(contacts[i].email.toLowerCase()===d.guestEmail.toLowerCase()){d.guestName=contacts[i].name;break}
+    if (d.guestEmail && !d.guestName) {
+        var list = getCt();
+        for (var i = 0; i < list.length; i++) {
+            if (list[i].email.toLowerCase() === d.guestEmail.toLowerCase()) { d.guestName = list[i].name; break; }
         }
     }
 
-    currentPreview={
-        title:d.title,date:d.date,time:d.time,duration:d.duration,
-        guestName:d.guestName,guestEmail:d.guestEmail,
-        yourEmail:yourEmail,description:d.description,
-        contactFound:!!contactFound
+    preview = {
+        title: d.title, date: d.date, time: d.time, duration: d.duration,
+        guestName: d.guestName, guestEmail: d.guestEmail,
+        yourEmail: yourEmail, note: d.note, found: !!cFound
     };
 
-    renderPreview();
-    document.getElementById('preview-section').style.display='block';
-    document.getElementById('preview-section').scrollIntoView({behavior:'smooth',block:'start'});
+    drawPreview();
+    document.getElementById('previewCard').style.display = 'block';
+    document.getElementById('previewCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
-function renderPreview(){
-    var d=currentPreview;if(!d)return;
-    var dateStr='—';if(d.date){var dt=new Date(d.date+'T00:00:00');dateStr=dt.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric',year:'numeric'})}
-    var timeStr='—';if(d.time){var tm=d.time.split(':');var h=parseInt(tm[0]);var m=tm[1];var ap=h>=12?'PM':'AM';var h12=h%12||12;timeStr=h12+':'+m+' '+ap}
+function drawPreview() {
+    var d = preview;
+    if (!d) return;
 
-    var guestHtml='';
-    if(d.guestEmail){
-        if(d.contactFound){
-            guestHtml='<span class="preview-value found"><i class="fa-solid fa-circle-check mr-1" style="font-size:12px"></i>'+d.guestName+' ('+d.guestEmail+')</span>';
-        }else{
-            guestHtml='<span class="preview-value found">'+d.guestEmail+'</span>';
-        }
-    }else if(d.guestName){
-        guestHtml='<div><span class="preview-value notfound"><i class="fa-solid fa-triangle-exclamation mr-1" style="font-size:12px"></i>'+d.guestName+' — email not found in contacts</span>'+
-            '<div class="flex gap-2 mt-2"><input id="pv-email" class="fi text-sm" style="max-width:280px" placeholder="Enter '+d.guestName+'\'s email">'+
-            '<button class="bp text-xs px-3" onclick="addEmailFromPreview()">Add</button></div></div>';
-    }else{
-        guestHtml='<span class="preview-value notfound">No guest specified — add a contact first</span>';
+    var dateStr = 'Not detected';
+    if (d.date) {
+        var dt = new Date(d.date + 'T00:00:00');
+        dateStr = dt.toLocaleDateString('en-US', { weekday:'short', month:'short', day:'numeric', year:'numeric' });
     }
 
-    var yourEmail=d.yourEmail||'<span style="color:var(--secondary)">Set in Settings</span>';
+    var timeStr = 'Not detected';
+    if (d.time) {
+        var p = d.time.split(':');
+        var h = parseInt(p[0]), m = p[1];
+        var ap = h >= 12 ? 'PM' : 'AM';
+        timeStr = (h % 12 || 12) + ':' + m + ' ' + ap;
+    }
 
-    var html='<div class="space-y-0">'+
-        pvRow('Title',d.title||'—')+
-        pvRow('Date',dateStr)+
-        pvRow('Time',timeStr)+
-        pvRow('Duration',d.duration+' minutes')+
-        pvRow('Guest',guestHtml,true)+
-        pvRow('Your Email',yourEmail)+
-        (d.description?pvRow('Note','<span style="color:var(--muted)">'+d.description+'</span>',true):'')+
-    '</div>';
+    var guestH = '';
+    if (d.guestEmail && d.guestName) {
+        guestH = '<span class="pv-val ok"><i class="fa-solid fa-circle-check" style="margin-right:4px;font-size:11px"></i>' + d.guestName + ' (' + d.guestEmail + ')</span>';
+    } else if (d.guestEmail) {
+        guestH = '<span class="pv-val ok">' + d.guestEmail + '</span>';
+    } else if (d.guestName) {
+        guestH = '<div><span class="pv-val missing"><i class="fa-solid fa-triangle-exclamation" style="margin-right:4px;font-size:11px"></i>' + d.guestName + ' &mdash; email not found in contacts</span>' +
+            '<div style="display:flex;gap:6px;margin-top:8px"><input id="pvEmail" class="input-field" style="max-width:260px;font-size:13px" placeholder="Enter email for ' + d.guestName + '"><button class="btn btn-green btn-sm" onclick="addPvEmail()">Add</button></div></div>';
+    } else {
+        guestH = '<span class="pv-val missing">No guest &mdash; add a contact first</span>';
+    }
 
-    document.getElementById('preview-content').innerHTML=html;
+    var yourH = d.yourEmail ? '<span class="pv-val">' + d.yourEmail + '</span>' : '<span class="pv-val missing">Set in Settings</span>';
 
-    // Enable/disable confirm button
-    var canConfirm=d.guestEmail&&d.yourEmail&&d.date&&d.time;
-    document.getElementById('confirm-btn').disabled=!canConfirm;
+    var h = '';
+    h += pvRow('Title', d.title || 'Not detected');
+    h += pvRow('Date', dateStr);
+    h += pvRow('Time', timeStr);
+    h += pvRow('Duration', d.duration + ' minutes');
+    h += pvRow('Guest', guestH, true);
+    h += pvRow('Your Email', yourH, true);
+    if (d.note) h += pvRow('Note', '<span style="color:var(--text3)">' + d.note + '</span>', true);
+
+    document.getElementById('previewBody').innerHTML = h;
+    document.getElementById('confirmBtn').disabled = !(d.guestEmail && d.yourEmail && d.date && d.time);
 }
 
-function pvRow(label,value,isHtml){
-    return '<div class="preview-row"><span class="preview-label">'+label+'</span>'+(isHtml?'<div class="flex-1">'+value+'</div>':'<span class="preview-value">'+value+'</span>')+'</div>';
+function pvRow(label, val, isHtml) {
+    return '<div class="pv-row"><span class="pv-label">' + label + '</span>' + (isHtml ? '<div style="flex:1">' + val + '</div>' : '<span class="pv-val">' + val + '</span>') + '</div>';
 }
 
-function addEmailFromPreview(){
-    var email=document.getElementById('pv-email').value.trim();
-    if(!email||!/\S+@\S+\.\S+/.test(email)){showToast('Please enter a valid email','err');return}
-    var name=currentPreview.guestName||email.split('@')[0];
-    // Add to contacts
-    var contacts=getContacts();
-    contacts.push({name:name,email:email});setContacts(contacts);
-    syncContactToSheet(name,email);
-    // Update preview
-    currentPreview.guestEmail=email;currentPreview.contactFound=false;
-    renderPreview();
-    showToast('Contact added: '+name+' ('+email+')','ok');
+function addPvEmail() {
+    var email = document.getElementById('pvEmail').value.trim();
+    if (!email || email.indexOf('@') < 1) { toast('Enter a valid email', 'err'); return; }
+    var name = preview.guestName || email.split('@')[0];
+    var list = getCt();
+    list.push({ name: name, email: email });
+    setCt(list);
+    pushCtToSheet(name, email);
+    preview.guestEmail = email;
+    preview.found = false;
+    drawPreview();
+    toast('Contact added: ' + name);
 }
 
-function hidePreview(){
-    document.getElementById('preview-section').style.display='none';currentPreview=null;
+function doEdit() {
+    document.getElementById('previewCard').style.display = 'none';
+    preview = null;
+    document.getElementById('speechText').focus();
 }
 
-/* ============================================================
-   CONFIRM & SCHEDULE
-============================================================ */
-function confirmSchedule(){
-    var d=currentPreview;if(!d)return;
-    if(!d.guestEmail||!d.yourEmail){showToast('Missing email — add contact first','err');return}
+/* ===== CONFIRM ===== */
+function doConfirm() {
+    var d = preview;
+    if (!d || !d.guestEmail || !d.yourEmail) { toast('Missing email', 'err'); return; }
 
-    var btn=document.getElementById('confirm-btn');
-    btn.disabled=true;btn.innerHTML='<span class="spin mr-2"></span> Scheduling...';
+    var btn = document.getElementById('confirmBtn');
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spin-icon"></span> Scheduling...';
 
-    var data={
-        action:'schedule',
-        title:d.title,date:d.date,time:d.time,duration:d.duration,
-        yourEmail:d.yourEmail,guestName:d.guestName||'',guestEmail:d.guestEmail,
-        description:d.description||''
+    var payload = {
+        action: 'schedule',
+        title: d.title, date: d.date, time: d.time, duration: d.duration,
+        yourEmail: d.yourEmail, guestName: d.guestName || '', guestEmail: d.guestEmail,
+        description: d.note || ''
     };
 
-    var scriptUrl=lsG('scriptUrl');
-    if(scriptUrl){
-        fetch(scriptUrl,{method:'POST',mode:'no-cors',headers:{'Content-Type':'text/plain'},body:JSON.stringify(data)})
-        .then(function(){
-            showToast('Meeting scheduled! Check Sheet/Calendar/Email.','ok');
-            showResultCard(data,true);finishSchedule(data,btn);
-        }).catch(function(err){
-            showToast('Error: '+err.message,'err');showResultCard(data,false);finishSchedule(data,btn);
+    var url = lg('scriptUrl');
+    if (url) {
+        fetch(url, {
+            method: 'POST', mode: 'no-cors',
+            headers: { 'Content-Type': 'text/plain' },
+            body: JSON.stringify(payload)
+        }).then(function() {
+            toast('Meeting scheduled! Check Sheet/Calendar/Email.');
+            showResult(payload, true);
+            afterConfirm(payload, btn);
+        }).catch(function(err) {
+            toast('Error: ' + err.message, 'err');
+            showResult(payload, false);
+            afterConfirm(payload, btn);
         });
-    }else{
-        showToast('Apps Script not configured — downloading .ics file','warn');
-        downloadICS(data);showResultCard(data,false);finishSchedule(data,btn);
+    } else {
+        toast('Apps Script not configured - downloading .ics', 'warn');
+        makeICS(payload);
+        showResult(payload, false);
+        afterConfirm(payload, btn);
     }
 }
 
-function finishSchedule(data,btn){
-    saveMeeting(data);hidePreview();
-    btn.disabled=false;btn.innerHTML='<i class="fa-solid fa-check mr-2"></i> Confirm &amp; Schedule';
+function afterConfirm(data, btn) {
+    saveMeeting(data);
+    document.getElementById('previewCard').style.display = 'none';
+    preview = null;
+    btn.disabled = false;
+    btn.innerHTML = '<i class="fa-solid fa-check"></i> Confirm &amp; Schedule';
 }
 
-function downloadICS(d){
-    var ds=d.date.replace(/-/g,'')+'T'+d.time.replace(/:/g,'')+'00';
-    var eh=parseInt(d.time.split(':')[0]);var em=parseInt(d.time.split(':')[1])+parseInt(d.duration);
-    var eho=eh+Math.floor(em/60);var emo=em%60;
-    var de=d.date.replace(/-/g,'')+'T'+String(eho).padStart(2,'0')+String(emo).padStart(2,'0')+'00';
-    var ics='BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//VMS//EN\r\nBEGIN:VEVENT\r\nDTSTART:'+ds+'\r\nDTEND:'+de+'\r\nSUMMARY:'+d.title+'\r\nDESCRIPTION:'+(d.description||'')+'\r\nATTENDEE;CN='+d.guestEmail+':mailto:'+d.guestEmail+'\r\nORGANIZER;CN='+d.yourEmail+':mailto:'+d.yourEmail+'\r\nEND:VEVENT\r\nEND:VCALENDAR';
-    var blob=new Blob([ics],{type:'text/calendar'});var url=URL.createObjectURL(blob);
-    var a=document.createElement('a');a.href=url;a.download=d.title.replace(/\s+/g,'_')+'.ics';document.body.appendChild(a);a.click();a.remove();URL.revokeObjectURL(url);
+function makeICS(d) {
+    var ds = d.date.replace(/-/g,'') + 'T' + d.time.replace(/:/g,'') + '00';
+    var eh = parseInt(d.time.split(':')[0]);
+    var em = parseInt(d.time.split(':')[1]) + parseInt(d.duration);
+    var eho = eh + Math.floor(em / 60);
+    var emo = em % 60;
+    var de = d.date.replace(/-/g,'') + 'T' + String(eho).padStart(2,'0') + String(emo).padStart(2,'0') + '00';
+    var ics = 'BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//VMS//EN\r\nBEGIN:VEVENT\r\nDTSTART:' + ds + '\r\nDTEND:' + de + '\r\nSUMMARY:' + d.title + '\r\nDESCRIPTION:' + (d.description||'') + '\r\nATTENDEE:mailto:' + d.guestEmail + '\r\nORGANIZER:mailto:' + d.yourEmail + '\r\nEND:VEVENT\r\nEND:VCALENDAR';
+    var blob = new Blob([ics], { type: 'text/calendar' });
+    var u = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = u; a.download = d.title.replace(/\s+/g,'_') + '.ics';
+    document.body.appendChild(a); a.click(); a.remove();
+    URL.revokeObjectURL(u);
 }
 
-function showResultCard(d,synced){
-    var sec=document.getElementById('result-section');
-    var dt=new Date(d.date+'T'+d.time);
-    var dateStr=dt.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric',year:'numeric'});
-    var timeStr=dt.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
-    var guestDisplay=d.guestName?d.guestName+' ('+d.guestEmail+')':d.guestEmail;
+function showResult(d, synced) {
+    var sec = document.getElementById('resultCard');
+    var dt = new Date(d.date + 'T' + d.time);
+    var dateStr = dt.toLocaleDateString('en-US', { weekday:'short', month:'short', day:'numeric' });
+    var timeStr = dt.toLocaleTimeString('en-US', { hour:'numeric', minute:'2-digit' });
+    var guest = d.guestName ? d.guestName + ' (' + d.guestEmail + ')' : d.guestEmail;
+    var label = synced ? 'Scheduled & Synced' : 'Scheduled Locally';
+    var desc = synced ? 'Saved to Sheet, Calendar created, Emails sent' : 'Configure Apps Script for auto-sync';
 
-    sec.innerHTML='<div class="flex items-center gap-3 mb-4"><i class="fa-solid fa-circle-check text-2xl" style="color:var(--accent)"></i><div><p class="font-bold text-lg" style="color:var(--accent)">'+(synced?'Meeting Scheduled & Synced':'Meeting Scheduled Locally')+'</p><p class="text-xs" style="color:var(--muted)">'+(synced?'Saved to Sheet, Calendar event created, Emails sent':'Configure Apps Script for auto-sync')+'</p></div></div>'+
-        '<div class="grid grid-cols-2 sm:grid-cols-4 gap-4">'+
-        rItem('fa-calendar',dateStr,'Date')+
-        rItem('fa-clock',timeStr,'Time')+
-        rItem('fa-hourglass-half',d.duration+' min','Duration')+
-        rItem('fa-user',guestDisplay,'Guest')+
+    sec.innerHTML = '<div style="display:flex;align-items:center;gap:10px;margin-bottom:14px"><i class="fa-solid fa-circle-check" style="font-size:24px;color:var(--accent)"></i><div><div style="font-size:17px;font-weight:700;color:var(--accent)">' + label + '</div><div style="font-size:12px;color:var(--text3)">' + desc + '</div></div></div>' +
+        '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px">' +
+        rBox('fa-calendar', dateStr, 'Date') +
+        rBox('fa-clock', timeStr, 'Time') +
+        rBox('fa-hourglass-half', d.duration + 'm', 'Duration') +
+        rBox('fa-user', guest, 'Guest') +
         '</div>';
-    sec.style.display='block';
-    sec.scrollIntoView({behavior:'smooth',block:'center'});
-    setTimeout(function(){sec.style.display='none'},8000);
+
+    sec.style.display = 'block';
+    sec.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    setTimeout(function() { sec.style.display = 'none'; }, 7000);
 }
 
-function rItem(icon,label,sub){
-    return '<div class="gc p-3 text-center"><i class="fa-solid '+icon+' text-lg mb-1" style="color:var(--accent)"></i><p class="text-sm font-semibold truncate">'+label+'</p><p class="text-xs" style="color:var(--muted)">'+sub+'</p></div>';
+function rBox(ico, label, sub) {
+    return '<div style="background:var(--card2);padding:10px;border-radius:8px;text-align:center"><i class="fa-solid ' + ico + '" style="font-size:16px;color:var(--accent);margin-bottom:4px"></i><div style="font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + label + '</div><div style="font-size:11px;color:var(--text3)">' + sub + '</div></div>';
 }
 
-/* ============================================================
-   MEETINGS — local storage
-============================================================ */
-function saveMeeting(d){
-    var meetings=lsG('meetings')||[];
-    meetings.unshift({title:d.title,date:d.date,time:d.time,duration:d.duration,guestName:d.guestName,guestEmail:d.guestEmail,timestamp:new Date().toISOString()});
-    if(meetings.length>50)meetings.length=50;
-    lsS('meetings',meetings);renderMeetings();
+/* ===== MEETINGS ===== */
+function saveMeeting(d) {
+    var list = lg('meetings') || [];
+    list.unshift({ title: d.title, date: d.date, time: d.time, duration: d.duration, guestName: d.guestName, guestEmail: d.guestEmail, ts: new Date().toISOString() });
+    if (list.length > 50) list.length = 50;
+    ls('meetings', list);
+    drawMt();
 }
 
-function renderMeetings(){
-    var box=document.getElementById('meetings-list');
-    var meetings=lsG('meetings')||[];
-    if(!meetings.length){box.innerHTML='<p class="text-xs" style="color:var(--muted)">No meetings yet. Schedule your first one with voice input above.</p>';return}
-    var html='';
-    for(var i=0;i<Math.min(meetings.length,20);i++){
-        var m=meetings[i];var dt=new Date(m.date+'T'+m.time);
-        var ds=dt.toLocaleDateString('en-US',{month:'short',day:'numeric'});
-        var ts=dt.toLocaleTimeString('en-US',{hour:'numeric',minute:'2-digit'});
-        var gn=m.guestName||m.guestEmail||'Unknown';
-        html+='<div class="meet-item"><div class="flex items-center justify-between"><p class="font-medium text-sm truncate flex-1">'+m.title+'</p><span class="text-xs ml-2 whitespace-nowrap" style="color:var(--muted)">'+ds+' '+ts+'</span></div><p class="text-xs mt-0.5" style="color:var(--muted)"><i class="fa-solid fa-user mr-1" style="font-size:10px"></i>'+gn+' &middot; '+m.duration+'m</p></div>';
+function drawMt() {
+    var box = document.getElementById('mtList');
+    var list = lg('meetings') || [];
+    if (!list.length) {
+        box.innerHTML = '<p style="font-size:12px;color:var(--text3)">No meetings yet. Schedule your first one above.</p>';
+        return;
     }
-    box.innerHTML=html;
+    var h = '';
+    var n = Math.min(list.length, 20);
+    for (var i = 0; i < n; i++) {
+        var m = list[i];
+        var dt = new Date(m.date + 'T' + m.time);
+        var ds = dt.toLocaleDateString('en-US', { month:'short', day:'numeric' });
+        var ts = dt.toLocaleTimeString('en-US', { hour:'numeric', minute:'2-digit' });
+        var gn = m.guestName || m.guestEmail || 'Unknown';
+        h += '<div class="mt-item"><div style="display:flex;justify-content:space-between;align-items:center"><span style="font-size:13px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1">' + m.title + '</span><span style="font-size:11px;color:var(--text3);white-space:nowrap;margin-left:6px">' + ds + ' ' + ts + '</span></div><div style="font-size:11px;color:var(--text3);margin-top:2px"><i class="fa-solid fa-user" style="font-size:9px;margin-right:3px"></i>' + gn + ' &middot; ' + m.duration + 'm</div></div>';
+    }
+    box.innerHTML = h;
 }
 
-function renderSheetMeetings(sheetMeetings){
-    // Merge sheet meetings into display (optional enhancement)
-}
+/* ===== INIT ===== */
+document.addEventListener('DOMContentLoaded', function() {
+    try {
+        document.getElementById('codeBox').textContent = GAS_CODE;
+    } catch(e) {}
 
-/* ============================================================
-   INIT
-============================================================ */
-document.addEventListener('DOMContentLoaded',function(){
-    loadSettings();initSpeech();renderContacts();renderMeetings();
-    document.getElementById('f-date'); // not needed anymore but just in case
+    loadSettings();
+    initSpeech();
+    drawCt();
+    drawMt();
 
-    // Fetch contacts from sheet on load
-    if(lsG('scriptUrl'))setTimeout(function(){fetchSheetContacts()},500);
+    if (lg('scriptUrl')) {
+        setTimeout(function() { pullCtFromSheet(); }, 600);
+    }
 
-    document.getElementById('lang-sel').addEventListener('change',function(){if(recognition)recognition.lang=this.value});
+    document.getElementById('langSel').addEventListener('change', function() {
+        if (recog) recog.lang = this.value;
+    });
 
-    // Close modals
-    document.addEventListener('keydown',function(e){if(e.key==='Escape'){closeModal('modal-setup');closeModal('modal-settings')}});
-    document.querySelectorAll('.modal-bg').forEach(function(m){m.addEventListener('click',function(e){if(e.target===m){m.classList.remove('open');document.body.style.overflow=''}})});
+    document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') {
+            hideModal('setupModal');
+            hideModal('settingsModal');
+        }
+    });
 
-    // Enter key on contact inputs
-    document.getElementById('c-name').addEventListener('keydown',function(e){if(e.key==='Enter')addContact()});
-    document.getElementById('c-email').addEventListener('keydown',function(e){if(e.key==='Enter')addContact()});
+    var overlays = document.querySelectorAll('.modal-overlay');
+    for (var i = 0; i < overlays.length; i++) {
+        overlays[i].addEventListener('click', function(e) {
+            if (e.target === this) this.classList.remove('visible');
+        });
+    }
+
+    document.getElementById('ctName').addEventListener('keydown', function(e) { if (e.key === 'Enter') doAddContact(); });
+    document.getElementById('ctEmail').addEventListener('keydown', function(e) { if (e.key === 'Enter') doAddContact(); });
 });
 </script>
 </body>
